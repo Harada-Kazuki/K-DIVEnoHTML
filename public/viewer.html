@@ -72,10 +72,6 @@
   <button id="connectBtn">接続して視聴</button>
 </div>
 
-<div style="margin-top: 20px; font-size: 14px; color: #aaa;">
-  <p id="connectionState">接続状態: -</p>
-</div>
-
 <div class="debug-info">
   <div><strong>デバッグ情報:</strong></div>
   <div id="debugLog"></div>
@@ -84,7 +80,6 @@
 <script>
 const WS_URL = "wss://k-divenohtml.onrender.com";
 
-// ✅ TURNサーバーを追加
 const ICE_SERVERS = [
   { urls: 'stun:stun.l.google.com:19302' },
   { urls: 'stun:stun1.l.google.com:19302' },
@@ -104,21 +99,20 @@ const ICE_SERVERS = [
 let ws = null;
 let pc = null;
 let reconnectInterval = null;
-let connectionTimeout = null;
+let myViewerId = null;
 
 const statusDiv = document.getElementById('status');
 const connectBtn = document.getElementById('connectBtn');
 const video = document.getElementById('remote');
 const debugLog = document.getElementById('debugLog');
-const connectionState = document.getElementById('connectionState');
 
 function log(msg) {
   console.log(msg);
   const time = new Date().toLocaleTimeString();
   debugLog.innerHTML = `[${time}] ${msg}<br>` + debugLog.innerHTML;
   const lines = debugLog.innerHTML.split('<br>');
-  if (lines.length > 20) {
-    debugLog.innerHTML = lines.slice(0, 20).join('<br>');
+  if (lines.length > 30) {
+    debugLog.innerHTML = lines.slice(0, 30).join('<br>');
   }
 }
 
@@ -152,7 +146,14 @@ function connectWebSocket() {
     try {
       const msg = JSON.parse(e.data);
       
-      if (msg.broadcasterDisconnected) {
+      // 登録完了
+      if (msg.type === 'registered' && msg.role === 'viewer') {
+        myViewerId = msg.viewerId;
+        log(`✅ 視聴者IDを取得: ${myViewerId}`);
+      }
+      
+      // 配信終了
+      else if (msg.type === 'broadcasterDisconnected') {
         log('🛑 配信が終了しました');
         updateStatus('配信が終了しました', 'status-error');
         if (pc) {
@@ -161,29 +162,12 @@ function connectWebSocket() {
         }
         video.srcObject = null;
         connectBtn.disabled = false;
-        connectionState.textContent = '接続状態: -';
-        if (connectionTimeout) {
-          clearTimeout(connectionTimeout);
-          connectionTimeout = null;
-        }
-        return;
       }
       
-      if (msg.offer) {
+      // 配信者からのOffer
+      else if (msg.type === 'offer') {
         log('📥 配信者からOfferを受信');
         updateStatus('配信に接続中...', 'status-connecting');
-        
-        // ✅ タイムアウト設定
-        connectionTimeout = setTimeout(() => {
-          log('⏱️ 接続タイムアウト（30秒経過）');
-          updateStatus('接続タイムアウト', 'status-error');
-          if (pc) {
-            pc.close();
-            pc = null;
-          }
-          video.srcObject = null;
-          connectBtn.disabled = false;
-        }, 30000);
         
         // PeerConnection作成
         if (pc) pc.close();
@@ -198,21 +182,29 @@ function connectWebSocket() {
         // リモートストリーム受信
         pc.ontrack = (e) => {
           log('📺 映像トラックを受信');
+          log(`📺 トラック情報: kind=${e.track.kind}, enabled=${e.track.enabled}, readyState=${e.track.readyState}`);
           video.srcObject = e.streams[0];
           updateStatus('✅ 視聴中', 'status-connected');
-          if (connectionTimeout) {
-            clearTimeout(connectionTimeout);
-            connectionTimeout = null;
-          }
+          
+          // ビデオ再生確認
+          video.onloadedmetadata = () => {
+            log('✅ ビデオメタデータ読み込み完了');
+            video.play().then(() => {
+              log('✅ ビデオ再生開始');
+            }).catch(err => {
+              log('❌ ビデオ再生エラー: ' + err.message);
+            });
+          };
         };
         
         // ICE候補の処理
-        let iceCandidateCount = 0;
         pc.onicecandidate = (e) => {
           if (e.candidate && ws && ws.readyState === WebSocket.OPEN) {
-            iceCandidateCount++;
-            log(`🧊 ICE候補送信 #${iceCandidateCount}`);
-            ws.send(JSON.stringify({ candidate: e.candidate }));
+            log('🧊 ICE候補を配信者に送信');
+            ws.send(JSON.stringify({ 
+              candidate: e.candidate,
+              viewerId: myViewerId
+            }));
           } else if (!e.candidate) {
             log('✅ ICE候補の収集完了');
           }
@@ -221,14 +213,9 @@ function connectWebSocket() {
         pc.oniceconnectionstatechange = () => {
           const state = pc.iceConnectionState;
           log(`🔄 ICE接続状態: ${state}`);
-          connectionState.textContent = `接続状態: ${state}`;
           
           if (state === 'connected' || state === 'completed') {
             updateStatus('✅ 視聴中', 'status-connected');
-            if (connectionTimeout) {
-              clearTimeout(connectionTimeout);
-              connectionTimeout = null;
-            }
           } else if (state === 'disconnected') {
             log('⚠️ 一時的に切断');
             updateStatus('接続が不安定です', 'status-error');
@@ -253,16 +240,23 @@ function connectWebSocket() {
         log('✅ LocalDescription設定完了');
         
         // Answerを送信
-        if (ws && ws.readyState === WebSocket.OPEN) {
-          log('📤 Answerをサーバーに送信');
-          ws.send(JSON.stringify({ answer }));
+        if (ws && ws.readyState === WebSocket.OPEN && myViewerId) {
+          log('📤 Answerを配信者に送信');
+          ws.send(JSON.stringify({ 
+            answer,
+            viewerId: myViewerId
+          }));
         }
         
         connectBtn.disabled = true;
-      } else if (msg.candidate && pc) {
+      }
+      
+      // 配信者からのICE候補
+      else if (msg.type === 'candidate' && pc) {
         log('🧊 配信者からICE候補を受信');
         await pc.addIceCandidate(new RTCIceCandidate(msg.candidate));
       }
+      
     } catch (err) {
       log('❌ メッセージ処理エラー: ' + err.message);
       updateStatus('エラー: ' + err.message, 'status-error');
@@ -279,7 +273,6 @@ function connectWebSocket() {
     updateStatus('切断されました', 'status-disconnected');
     connectBtn.disabled = false;
     
-    // 自動再接続
     if (!reconnectInterval) {
       reconnectInterval = setInterval(() => {
         log('🔄 自動再接続を試行...');
@@ -293,14 +286,11 @@ connectBtn.onclick = () => {
   connectWebSocket();
 };
 
-// ページ離脱時のクリーンアップ
 window.addEventListener('beforeunload', () => {
   if (pc) pc.close();
   if (ws) ws.close();
-  if (connectionTimeout) clearTimeout(connectionTimeout);
 });
 
-// 初期接続
 connectWebSocket();
 log('🚀 視聴者ページ読み込み完了');
 </script>
