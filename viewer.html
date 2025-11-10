@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<title>視聴者 | WebRTC Viewer</title>
+</head>
+<body style="background:#111;color:#eee;text-align:center;font-family:sans-serif;">
+<h1>📱 視聴ページ</h1>
+<video id="remote" autoplay playsinline style="width:80%;border-radius:12px;"></video>
+<br>
+<button id="connectBtn">接続</button>
+
+<script>
+const ws = new WebSocket("wss://YOUR_SERVER.fly.dev"); // 同じURL
+const pc = new RTCPeerConnection({ iceServers: [{urls:'stun:stun.l.google.com:19302'}] });
+const video = document.getElementById('remote');
+
+ws.onmessage = async (e) => {
+  const msg = JSON.parse(e.data);
+  if (msg.offer) {
+    await pc.setRemoteDescription(msg.offer);
+    const answer = await pc.createAnswer();
+    await pc.setLocalDescription(answer);
+    ws.send(JSON.stringify({ answer }));
+  } else if (msg.candidate) {
+    await pc.addIceCandidate(msg.candidate);
+  }
+};
+
+pc.ontrack = (e) => { video.srcObject = e.streams[0]; };
+pc.onicecandidate = (e) => {
+  if (e.candidate) ws.send(JSON.stringify({ candidate: e.candidate }));
+};
+
+document.getElementById('connectBtn').onclick = () => {
+  ws.send(JSON.stringify({ viewer: true }));
+};
+</script>
+</body>
+</html>
