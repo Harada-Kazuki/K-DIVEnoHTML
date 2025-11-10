@@ -2,41 +2,237 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>配信者 | OBS VirtualCam → WebRTC</title>
+<style>
+  body {
+    background: #111;
+    color: #eee;
+    text-align: center;
+    font-family: sans-serif;
+    margin: 0;
+    padding: 20px;
+  }
+  #local {
+    width: 90%;
+    max-width: 800px;
+    border-radius: 12px;
+    background: #000;
+    margin: 20px auto;
+  }
+  button {
+    padding: 12px 30px;
+    font-size: 16px;
+    border-radius: 8px;
+    border: none;
+    background: #4CAF50;
+    color: white;
+    cursor: pointer;
+    margin: 10px;
+  }
+  button:disabled {
+    background: #666;
+    cursor: not-allowed;
+  }
+  button:hover:not(:disabled) {
+    background: #45a049;
+  }
+  #stopBtn {
+    background: #f44336;
+  }
+  #stopBtn:hover:not(:disabled) {
+    background: #da190b;
+  }
+  #status {
+    margin: 20px;
+    padding: 10px;
+    border-radius: 8px;
+    display: inline-block;
+  }
+  .status-disconnected { background: #666; }
+  .status-connected { background: #2196F3; }
+  .status-streaming { background: #4CAF50; }
+  .status-error { background: #f44336; }
+</style>
 </head>
-<body style="background:#111;color:#eee;text-align:center;font-family:sans-serif;">
+<body>
 <h1>🎥 配信者ページ</h1>
-<p>OBSの仮想カメラをONにして「配信開始」クリック</p>
-<video id="local" autoplay playsinline style="width:80%;border-radius:12px;"></video>
-<br>
-<button id="startBtn">配信開始</button>
+<p>OBSの仮想カメラをONにして「配信開始」をクリック</p>
+
+<div id="status" class="status-disconnected">未接続</div>
+
+<video id="local" autoplay playsinline muted></video>
+
+<div>
+  <button id="startBtn">配信開始</button>
+  <button id="stopBtn" disabled>配信停止</button>
+</div>
+
+<div style="margin-top: 20px; font-size: 14px; color: #aaa;">
+  <p id="viewerCount">視聴者: 0人</p>
+</div>
 
 <script>
-const ws = new WebSocket("wss://fancy-king-df6d.kawaguchigumi-0029.workers.dev/"); // ← あとでserver.jsをデプロイしたURLに変更
-const pc = new RTCPeerConnection({ iceServers: [{urls:'stun:stun.l.google.com:19302'}] });
+const WS_URL = "wss://fancy-king-df6d.kawaguchigumi-0029.workers.dev/";
+const ICE_SERVERS = [
+  { urls: 'stun:stun.l.google.com:19302' },
+  { urls: 'stun:stun1.l.google.com:19302' }
+];
+
+let ws = null;
+let pc = null;
+let localStream = null;
+let reconnectInterval = null;
+
+const statusDiv = document.getElementById('status');
+const startBtn = document.getElementById('startBtn');
+const stopBtn = document.getElementById('stopBtn');
 const video = document.getElementById('local');
 
-ws.onmessage = async (e) => {
-  const msg = JSON.parse(e.data);
-  if (msg.answer) {
-    await pc.setRemoteDescription(msg.answer);
-  } else if (msg.candidate) {
-    await pc.addIceCandidate(msg.candidate);
+function updateStatus(text, className) {
+  statusDiv.textContent = text;
+  statusDiv.className = className;
+}
+
+function connectWebSocket() {
+  if (ws && ws.readyState === WebSocket.OPEN) return;
+  
+  updateStatus('接続中...', 'status-connected');
+  ws = new WebSocket(WS_URL);
+  
+  ws.onopen = () => {
+    console.log('WebSocket connected');
+    updateStatus('接続済み (配信待機中)', 'status-connected');
+    if (reconnectInterval) {
+      clearInterval(reconnectInterval);
+      reconnectInterval = null;
+    }
+  };
+  
+  ws.onmessage = async (e) => {
+    try {
+      const msg = JSON.parse(e.data);
+      
+      if (msg.answer && pc) {
+        await pc.setRemoteDescription(new RTCSessionDescription(msg.answer));
+        console.log('Answer received from viewer');
+      } else if (msg.candidate && pc) {
+        await pc.addIceCandidate(new RTCIceCandidate(msg.candidate));
+      }
+    } catch (err) {
+      console.error('Error handling message:', err);
+    }
+  };
+  
+  ws.onerror = (err) => {
+    console.error('WebSocket error:', err);
+    updateStatus('接続エラー', 'status-error');
+  };
+  
+  ws.onclose = () => {
+    console.log('WebSocket closed');
+    updateStatus('切断されました', 'status-disconnected');
+    
+    // 自動再接続
+    if (!reconnectInterval) {
+      reconnectInterval = setInterval(() => {
+        console.log('Attempting to reconnect...');
+        connectWebSocket();
+      }, 3000);
+    }
+  };
+}
+
+async function startBroadcast() {
+  try {
+    updateStatus('カメラ起動中...', 'status-connected');
+    
+    // カメラ取得
+    localStream = await navigator.mediaDevices.getUserMedia({
+      video: {
+        width: { ideal: 1280 },
+        height: { ideal: 720 }
+      },
+      audio: false
+    });
+    
+    video.srcObject = localStream;
+    
+    // PeerConnection作成
+    pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
+    
+    // トラック追加
+    localStream.getTracks().forEach(track => {
+      pc.addTrack(track, localStream);
+    });
+    
+    // ICE候補の処理
+    pc.onicecandidate = (e) => {
+      if (e.candidate && ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ candidate: e.candidate }));
+      }
+    };
+    
+    pc.oniceconnectionstatechange = () => {
+      console.log('ICE connection state:', pc.iceConnectionState);
+      if (pc.iceConnectionState === 'connected') {
+        updateStatus('🔴 配信中', 'status-streaming');
+      } else if (pc.iceConnectionState === 'disconnected' || pc.iceConnectionState === 'failed') {
+        updateStatus('接続が切れました', 'status-error');
+      }
+    };
+    
+    // Offer作成
+    const offer = await pc.createOffer();
+    await pc.setLocalDescription(offer);
+    
+    // Offerを送信
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({ offer }));
+      updateStatus('配信準備完了', 'status-streaming');
+    }
+    
+    startBtn.disabled = true;
+    stopBtn.disabled = false;
+    
+  } catch (err) {
+    console.error('Error starting broadcast:', err);
+    updateStatus('エラー: ' + err.message, 'status-error');
+    alert('カメラの起動に失敗しました。OBSの仮想カメラがONになっているか確認してください。');
   }
-};
+}
 
-document.getElementById('startBtn').onclick = async () => {
-  const stream = await navigator.mediaDevices.getUserMedia({ video:true, audio:false });
-  stream.getTracks().forEach(track => pc.addTrack(track, stream));
-  video.srcObject = stream;
-  const offer = await pc.createOffer();
-  await pc.setLocalDescription(offer);
-  ws.send(JSON.stringify({ offer }));
-};
+function stopBroadcast() {
+  // ストリーム停止
+  if (localStream) {
+    localStream.getTracks().forEach(track => track.stop());
+    localStream = null;
+  }
+  
+  // PeerConnection終了
+  if (pc) {
+    pc.close();
+    pc = null;
+  }
+  
+  video.srcObject = null;
+  updateStatus('配信停止', 'status-connected');
+  
+  startBtn.disabled = false;
+  stopBtn.disabled = true;
+}
 
-pc.onicecandidate = (e) => {
-  if (e.candidate) ws.send(JSON.stringify({ candidate: e.candidate }));
-};
+startBtn.onclick = startBroadcast;
+stopBtn.onclick = stopBroadcast;
+
+// ページ離脱時のクリーンアップ
+window.addEventListener('beforeunload', () => {
+  stopBroadcast();
+  if (ws) ws.close();
+});
+
+// 初期接続
+connectWebSocket();
 </script>
 </body>
 </html>
