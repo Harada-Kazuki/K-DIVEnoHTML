@@ -11,7 +11,7 @@
 <button id="connectBtn">接続</button>
 
 <script>
-const ws = new WebSocket("wss://YOUR_SERVER.fly.dev"); // 同じURL
+const ws = new WebSocket("wss://fancy-king-df6d.kawaguchigumi-0029.workers.dev/"); // 同じURL
 const pc = new RTCPeerConnection({ iceServers: [{urls:'stun:stun.l.google.com:19302'}] });
 const video = document.getElementById('remote');
 
