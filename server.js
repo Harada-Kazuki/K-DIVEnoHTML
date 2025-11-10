@@ -1,4 +1,4 @@
-// server.js
+// server.js（修正版）
 import express from "express";
 import { WebSocketServer } from "ws";
 import http from "http";
@@ -12,43 +12,44 @@ const app = express();
 const server = http.createServer(app);
 const wss = new WebSocketServer({ server });
 
-// ✅ public フォルダ内を静的配信
 app.use(express.static(path.join(__dirname, "public")));
-
-// デフォルトルートを index.html に
 app.get("/", (req, res) => {
   res.sendFile(path.join(__dirname, "public", "index.html"));
 });
 
+// ✅ 追加: 最新のOfferを保存しておく
 let broadcaster = null;
+let latestOffer = null;
 const viewers = new Set();
 
 wss.on("connection", (ws) => {
   ws.on("message", (msg) => {
     const data = JSON.parse(msg);
 
-    // 🎥 配信者からの接続
+    // 🎥 配信者がOfferを送った
     if (data.offer) {
       broadcaster = ws;
-      console.log("📡 Broadcaster connected");
+      latestOffer = data.offer; // ✅ Offerを保存
+      console.log("📡 Broadcaster sent offer");
       viewers.forEach(v => v.send(JSON.stringify({ offer: data.offer })));
     }
 
-    // 👀 視聴者登録
+    // 👀 視聴者が接続
     if (data.viewer) {
       viewers.add(ws);
       console.log("👤 Viewer connected (total:", viewers.size, ")");
-      if (broadcaster) {
-        broadcaster.send(JSON.stringify({ viewerConnected: true }));
+      // ✅ すでに配信中なら、最新のOfferを即送信
+      if (latestOffer) {
+        ws.send(JSON.stringify({ offer: latestOffer }));
       }
     }
 
-    // 👀 Answerを配信者へ中継
+    // 👀 視聴者からAnswerを受け取った
     if (data.answer && broadcaster) {
       broadcaster.send(JSON.stringify({ answer: data.answer }));
     }
 
-    // ICE候補を中継
+    // ICE候補の中継
     if (data.candidate) {
       if (ws === broadcaster) {
         viewers.forEach(v => v.send(JSON.stringify({ candidate: data.candidate })));
@@ -62,6 +63,7 @@ wss.on("connection", (ws) => {
     if (ws === broadcaster) {
       console.log("🛑 Broadcaster disconnected");
       broadcaster = null;
+      latestOffer = null; // ✅ 配信が終わったらクリア
       viewers.forEach(v => v.send(JSON.stringify({ broadcasterDisconnected: true })));
     } else {
       viewers.delete(ws);
