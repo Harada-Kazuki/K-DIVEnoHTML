@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <title>OBS VirtualCam → WebRTC Demo</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      background: #111;
+      color: #eee;
+      text-align: center;
+      margin: 0;
+      padding: 2rem;
+    }
+    video {
+      width: 80%;
+      max-width: 800px;
+      border-radius: 12px;
+      background: #000;
+      margin-top: 1rem;
+    }
+    button {
+      padding: 0.5rem 1rem;
+      font-size: 1rem;
+      margin: 0.5rem;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+    button:hover {
+      background: #333;
+    }
+  </style>
+</head>
+<body>
+  <h1>🎥 OBS VirtualCam → WebRTC</h1>
+  <p>OBSの仮想カメラをONにしてから「カメラを開始」をクリック</p>
+
+  <button id="startBtn">カメラを開始</button>
+  <video id="localVideo" autoplay playsinline></video>
+
+  <script>
+    const startBtn = document.getElementById("startBtn");
+    const videoEl = document.getElementById("localVideo");
+
+    startBtn.onclick = async () => {
+      try {
+        // OBSの仮想カメラをキャプチャ（デフォルトカメラ扱い）
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: true,
+          audio: false
+        });
+        videoEl.srcObject = stream;
+        startBtn.disabled = true;
+        startBtn.textContent = "カメラ起動中";
+        console.log("✅ 仮想カメラ映像を取得しました。");
+      } catch (err) {
+        console.error("カメラ取得エラー:", err);
+        alert("カメラ取得に失敗しました: " + err.message);
+      }
+    };
+  </script>
+</body>
+</html>
