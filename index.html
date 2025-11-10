@@ -101,7 +101,7 @@ function connectWebSocket() {
   ws = new WebSocket(WS_URL);
   
   ws.onopen = () => {
-    console.log('WebSocket connected');
+    console.log('✅ WebSocket connected');
     updateStatus('接続済み (配信待機中)', 'status-connected');
     if (reconnectInterval) {
       clearInterval(reconnectInterval);
@@ -112,15 +112,17 @@ function connectWebSocket() {
   ws.onmessage = async (e) => {
     try {
       const msg = JSON.parse(e.data);
+      console.log('📨 Received message:', msg);
       
       if (msg.answer && pc) {
+        console.log('✅ Answer received from viewer');
         await pc.setRemoteDescription(new RTCSessionDescription(msg.answer));
-        console.log('Answer received from viewer');
       } else if (msg.candidate && pc) {
+        console.log('🧊 ICE candidate received');
         await pc.addIceCandidate(new RTCIceCandidate(msg.candidate));
       }
     } catch (err) {
-      console.error('Error handling message:', err);
+      console.error('❌ Error handling message:', err);
     }
   };
   
@@ -130,13 +132,13 @@ function connectWebSocket() {
   };
   
   ws.onclose = () => {
-    console.log('WebSocket closed');
+    console.log('🔌 WebSocket closed');
     updateStatus('切断されました', 'status-disconnected');
     
     // 自動再接続
     if (!reconnectInterval) {
       reconnectInterval = setInterval(() => {
-        console.log('Attempting to reconnect...');
+        console.log('🔄 Attempting to reconnect...');
         connectWebSocket();
       }, 3000);
     }
@@ -145,6 +147,7 @@ function connectWebSocket() {
 
 async function startBroadcast() {
   try {
+    console.log('🎬 Starting broadcast...');
     updateStatus('カメラ起動中...', 'status-connected');
     
     // カメラ取得
@@ -156,25 +159,31 @@ async function startBroadcast() {
       audio: false
     });
     
+    console.log('📹 Camera acquired');
     video.srcObject = localStream;
     
     // PeerConnection作成
     pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
+    console.log('🔗 PeerConnection created');
     
     // トラック追加
     localStream.getTracks().forEach(track => {
       pc.addTrack(track, localStream);
+      console.log('➕ Track added:', track.kind);
     });
     
     // ICE候補の処理
     pc.onicecandidate = (e) => {
       if (e.candidate && ws && ws.readyState === WebSocket.OPEN) {
+        console.log('🧊 Sending ICE candidate');
         ws.send(JSON.stringify({ candidate: e.candidate }));
+      } else if (!e.candidate) {
+        console.log('✅ ICE gathering complete');
       }
     };
     
     pc.oniceconnectionstatechange = () => {
-      console.log('ICE connection state:', pc.iceConnectionState);
+      console.log('🔄 ICE connection state:', pc.iceConnectionState);
       if (pc.iceConnectionState === 'connected') {
         updateStatus('🔴 配信中', 'status-streaming');
       } else if (pc.iceConnectionState === 'disconnected' || pc.iceConnectionState === 'failed') {
@@ -183,20 +192,26 @@ async function startBroadcast() {
     };
     
     // Offer作成
+    console.log('📝 Creating offer...');
     const offer = await pc.createOffer();
     await pc.setLocalDescription(offer);
+    console.log('✅ Local description set');
     
     // Offerを送信
     if (ws && ws.readyState === WebSocket.OPEN) {
+      console.log('📤 Sending offer to server');
       ws.send(JSON.stringify({ offer }));
       updateStatus('配信準備完了', 'status-streaming');
+    } else {
+      console.error('❌ WebSocket not ready');
+      throw new Error('WebSocket接続がありません');
     }
     
     startBtn.disabled = true;
     stopBtn.disabled = false;
     
   } catch (err) {
-    console.error('Error starting broadcast:', err);
+    console.error('❌ Error starting broadcast:', err);
     updateStatus('エラー: ' + err.message, 'status-error');
     alert('カメラの起動に失敗しました。OBSの仮想カメラがONになっているか確認してください。');
   }
