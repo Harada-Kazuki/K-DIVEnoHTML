@@ -1,9 +1,10 @@
-// server.js（改善版 - 10人視聴対応）
+// server.js（修正版 - 視聴者ごとにOffer/Answer管理）
 import express from "express";
 import { WebSocketServer } from "ws";
 import http from "http";
 import path from "path";
 import { fileURLToPath } from "url";
+import { randomUUID } from "crypto";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -19,110 +20,127 @@ app.get("/", (req, res) => {
 
 // 配信状態の管理
 let broadcaster = null;
-let latestOffer = null;
-let broadcasterIceCandidates = []; // ✅ ICE候補を保存
-const viewers = new Map(); // Set から Map に変更（視聴者ごとの情報を保存）
+const viewers = new Map(); // viewerId -> { ws, id, connectedAt }
 
-// ✅ 定期的なクリーンアップ（切断されたコネクションを削除）
+// 定期的なクリーンアップ
 setInterval(() => {
-  viewers.forEach((viewerInfo, ws) => {
-    if (ws.readyState !== 1) { // 1 = OPEN
-      viewers.delete(ws);
-      console.log("🧹 Cleaned up disconnected viewer");
+  viewers.forEach((viewerInfo, id) => {
+    if (viewerInfo.ws.readyState !== 1) {
+      viewers.delete(id);
+      console.log(`🧹 Cleaned up viewer ${id}`);
     }
   });
-}, 30000); // 30秒ごと
+}, 30000);
 
 wss.on("connection", (ws) => {
   console.log("🔌 New WebSocket connection");
   
-  // ✅ 接続維持のためのping/pong
+  let viewerId = null;
+  let isBroadcaster = false;
+  
+  // 接続維持のためのping/pong
   const pingInterval = setInterval(() => {
     if (ws.readyState === 1) {
       ws.ping();
     }
-  }, 25000); // 25秒ごと
-
-  ws.on("pong", () => {
-    if (viewers.has(ws)) {
-      viewers.get(ws).lastPong = Date.now();
-    }
-  });
+  }, 25000);
 
   ws.on("message", (msg) => {
     try {
       const data = JSON.parse(msg);
 
-      // 🎥 配信者がOfferを送った
-      if (data.offer) {
+      // 🎥 配信者として登録
+      if (data.broadcaster) {
         broadcaster = ws;
-        latestOffer = data.offer;
-        broadcasterIceCandidates = []; // 新しい配信の開始時にリセット
-        console.log("📡 Broadcaster sent offer (viewers:", viewers.size, ")");
-        
-        // 全視聴者にOfferを送信
-        viewers.forEach((viewerInfo, viewerWs) => {
-          if (viewerWs.readyState === 1) {
-            viewerWs.send(JSON.stringify({ offer: data.offer }));
-            viewerInfo.offerSent = true;
-          }
-        });
+        isBroadcaster = true;
+        console.log("📡 Broadcaster registered");
+        ws.send(JSON.stringify({ 
+          type: 'registered',
+          role: 'broadcaster'
+        }));
+        return;
       }
 
-      // 👀 視聴者が接続
+      // 👀 視聴者として登録
       if (data.viewer) {
-        viewers.set(ws, {
-          connectedAt: Date.now(),
-          lastPong: Date.now(),
-          offerSent: false,
-          iceCandidatesSent: false
+        viewerId = randomUUID();
+        viewers.set(viewerId, {
+          ws,
+          id: viewerId,
+          connectedAt: Date.now()
         });
-        console.log("👤 Viewer connected (total:", viewers.size, ")");
+        console.log(`👤 Viewer ${viewerId} registered (total: ${viewers.size})`);
         
-        // ✅ 配信中なら、Offer + ICE候補を送信
-        if (latestOffer && broadcaster) {
-          ws.send(JSON.stringify({ offer: latestOffer }));
-          viewers.get(ws).offerSent = true;
-          
-          // ✅ 保存されたICE候補も送信
-          if (broadcasterIceCandidates.length > 0) {
-            console.log(`📤 Sending ${broadcasterIceCandidates.length} ICE candidates to new viewer`);
-            broadcasterIceCandidates.forEach(candidate => {
-              ws.send(JSON.stringify({ candidate }));
-            });
-            viewers.get(ws).iceCandidatesSent = true;
-          }
+        // 視聴者にIDを送信
+        ws.send(JSON.stringify({ 
+          type: 'registered',
+          role: 'viewer',
+          viewerId
+        }));
+        
+        // 配信者に新しい視聴者を通知
+        if (broadcaster && broadcaster.readyState === 1) {
+          broadcaster.send(JSON.stringify({
+            type: 'newViewer',
+            viewerId
+          }));
+          console.log(`📤 Notified broadcaster about viewer ${viewerId}`);
         }
+        return;
       }
 
-      // 👀 視聴者からAnswerを受け取った
-      if (data.answer && broadcaster && broadcaster.readyState === 1) {
-        console.log("📥 Received answer from viewer");
-        broadcaster.send(JSON.stringify({ answer: data.answer }));
+      // 🎥 配信者からのOffer（視聴者IDを含む）
+      if (data.offer && data.targetViewerId) {
+        const viewer = viewers.get(data.targetViewerId);
+        if (viewer && viewer.ws.readyState === 1) {
+          console.log(`📤 Sending offer to viewer ${data.targetViewerId}`);
+          viewer.ws.send(JSON.stringify({ 
+            type: 'offer',
+            offer: data.offer 
+          }));
+        } else {
+          console.log(`❌ Viewer ${data.targetViewerId} not found or disconnected`);
+        }
+        return;
       }
 
-      // ✅ ICE候補の中継（改善版）
-      if (data.candidate) {
-        if (ws === broadcaster) {
-          // 配信者からのICE候補を保存
-          broadcasterIceCandidates.push(data.candidate);
-          console.log(`🧊 Broadcaster ICE candidate saved (total: ${broadcasterIceCandidates.length})`);
-          
-          // 全視聴者に送信
-          let sentCount = 0;
-          viewers.forEach((viewerInfo, viewerWs) => {
-            if (viewerWs.readyState === 1 && viewerInfo.offerSent) {
-              viewerWs.send(JSON.stringify({ candidate: data.candidate }));
-              sentCount++;
-            }
-          });
-          console.log(`📤 Sent ICE candidate to ${sentCount} viewers`);
-        } else if (broadcaster && broadcaster.readyState === 1) {
-          // 視聴者からのICE候補を配信者に送信
-          console.log("🧊 Forwarding viewer ICE candidate to broadcaster");
-          broadcaster.send(JSON.stringify({ candidate: data.candidate }));
+      // 👀 視聴者からのAnswer
+      if (data.answer && data.viewerId) {
+        if (broadcaster && broadcaster.readyState === 1) {
+          console.log(`📤 Sending answer from viewer ${data.viewerId} to broadcaster`);
+          broadcaster.send(JSON.stringify({
+            type: 'answer',
+            answer: data.answer,
+            viewerId: data.viewerId
+          }));
         }
+        return;
       }
+
+      // ICE候補の中継（配信者 → 視聴者）
+      if (data.candidate && data.targetViewerId && isBroadcaster) {
+        const viewer = viewers.get(data.targetViewerId);
+        if (viewer && viewer.ws.readyState === 1) {
+          viewer.ws.send(JSON.stringify({ 
+            type: 'candidate',
+            candidate: data.candidate 
+          }));
+        }
+        return;
+      }
+
+      // ICE候補の中継（視聴者 → 配信者）
+      if (data.candidate && data.viewerId && !isBroadcaster) {
+        if (broadcaster && broadcaster.readyState === 1) {
+          broadcaster.send(JSON.stringify({
+            type: 'candidate',
+            candidate: data.candidate,
+            viewerId: data.viewerId
+          }));
+        }
+        return;
+      }
+
     } catch (err) {
       console.error("❌ Error handling message:", err);
     }
@@ -131,22 +149,30 @@ wss.on("connection", (ws) => {
   ws.on("close", () => {
     clearInterval(pingInterval);
     
-    if (ws === broadcaster) {
+    if (isBroadcaster) {
       console.log("🛑 Broadcaster disconnected");
       broadcaster = null;
-      latestOffer = null;
-      broadcasterIceCandidates = [];
       
       // 全視聴者に通知
-      viewers.forEach((viewerInfo, viewerWs) => {
-        if (viewerWs.readyState === 1) {
-          viewerWs.send(JSON.stringify({ broadcasterDisconnected: true }));
+      viewers.forEach((viewer) => {
+        if (viewer.ws.readyState === 1) {
+          viewer.ws.send(JSON.stringify({ 
+            type: 'broadcasterDisconnected' 
+          }));
         }
       });
       viewers.clear();
-    } else {
-      viewers.delete(ws);
-      console.log("👋 Viewer disconnected (remaining:", viewers.size, ")");
+    } else if (viewerId) {
+      viewers.delete(viewerId);
+      console.log(`👋 Viewer ${viewerId} disconnected (remaining: ${viewers.size})`);
+      
+      // 配信者に通知
+      if (broadcaster && broadcaster.readyState === 1) {
+        broadcaster.send(JSON.stringify({
+          type: 'viewerDisconnected',
+          viewerId
+        }));
+      }
     }
   });
 
