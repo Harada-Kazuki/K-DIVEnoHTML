@@ -1,64 +1,42 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8" />
-  <title>OBS VirtualCam → WebRTC Demo</title>
-  <style>
-    body {
-      font-family: sans-serif;
-      background: #111;
-      color: #eee;
-      text-align: center;
-      margin: 0;
-      padding: 2rem;
-    }
-    video {
-      width: 80%;
-      max-width: 800px;
-      border-radius: 12px;
-      background: #000;
-      margin-top: 1rem;
-    }
-    button {
-      padding: 0.5rem 1rem;
-      font-size: 1rem;
-      margin: 0.5rem;
-      border: none;
-      border-radius: 8px;
-      cursor: pointer;
-    }
-    button:hover {
-      background: #333;
-    }
-  </style>
+<meta charset="UTF-8" />
+<title>配信者 | OBS VirtualCam → WebRTC</title>
 </head>
-<body>
-  <h1>🎥 OBS VirtualCam → WebRTC</h1>
-  <p>OBSの仮想カメラをONにしてから「カメラを開始」をクリック</p>
+<body style="background:#111;color:#eee;text-align:center;font-family:sans-serif;">
+<h1>🎥 配信者ページ</h1>
+<p>OBSの仮想カメラをONにして「配信開始」クリック</p>
+<video id="local" autoplay playsinline style="width:80%;border-radius:12px;"></video>
+<br>
+<button id="startBtn">配信開始</button>
 
-  <button id="startBtn">カメラを開始</button>
-  <video id="localVideo" autoplay playsinline></video>
+<script>
+const ws = new WebSocket("wss://YOUR_SERVER.fly.dev"); // ← あとでserver.jsをデプロイしたURLに変更
+const pc = new RTCPeerConnection({ iceServers: [{urls:'stun:stun.l.google.com:19302'}] });
+const video = document.getElementById('local');
 
-  <script>
-    const startBtn = document.getElementById("startBtn");
-    const videoEl = document.getElementById("localVideo");
+ws.onmessage = async (e) => {
+  const msg = JSON.parse(e.data);
+  if (msg.answer) {
+    await pc.setRemoteDescription(msg.answer);
+  } else if (msg.candidate) {
+    await pc.addIceCandidate(msg.candidate);
+  }
+};
 
-    startBtn.onclick = async () => {
-      try {
-        // OBSの仮想カメラをキャプチャ（デフォルトカメラ扱い）
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: true,
-          audio: false
-        });
-        videoEl.srcObject = stream;
-        startBtn.disabled = true;
-        startBtn.textContent = "カメラ起動中";
-        console.log("✅ 仮想カメラ映像を取得しました。");
-      } catch (err) {
-        console.error("カメラ取得エラー:", err);
-        alert("カメラ取得に失敗しました: " + err.message);
-      }
-    };
-  </script>
+document.getElementById('startBtn').onclick = async () => {
+  const stream = await navigator.mediaDevices.getUserMedia({ video:true, audio:false });
+  stream.getTracks().forEach(track => pc.addTrack(track, stream));
+  video.srcObject = stream;
+  const offer = await pc.createOffer();
+  await pc.setLocalDescription(offer);
+  ws.send(JSON.stringify({ offer }));
+};
+
+pc.onicecandidate = (e) => {
+  if (e.candidate) ws.send(JSON.stringify({ candidate: e.candidate }));
+};
+</script>
 </body>
 </html>
