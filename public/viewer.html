@@ -3,201 +3,82 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>視聴者 | WebRTC Viewer</title>
+<title>視聴端末 // NieR StreamView</title>
 <style>
   body {
-    background: #111;
-    color: #eee;
-    text-align: center;
-    font-family: sans-serif;
     margin: 0;
-    padding: 20px;
+    padding: 40px 20px;
+    background: linear-gradient(160deg, #111, #000);
+    font-family: 'Courier New', monospace;
+    color: #ccc;
+    text-align: center;
   }
+  h1 { letter-spacing: 3px; text-shadow: 0 0 10px #888; font-weight: 300; }
   #remote {
     width: 90%;
     max-width: 800px;
+    border: 1px solid #444;
     border-radius: 12px;
     background: #000;
     margin: 20px auto;
+    box-shadow: 0 0 25px rgba(0,255,255,0.15);
   }
   button {
-    padding: 12px 30px;
+    background: #222;
+    color: #ddd;
+    border: 1px solid #666;
+    padding: 12px 40px;
+    margin: 8px;
+    border-radius: 6px;
     font-size: 16px;
-    border-radius: 8px;
-    border: none;
-    background: #2196F3;
-    color: white;
     cursor: pointer;
-    margin: 10px;
+    transition: all .3s;
   }
-  button:disabled {
-    background: #666;
-    cursor: not-allowed;
-  }
-  button:hover:not(:disabled) {
-    background: #0b7dda;
-  }
-  #status {
-    margin: 20px;
-    padding: 10px;
-    border-radius: 8px;
-    display: inline-block;
-  }
-  .status-disconnected { background: #666; }
-  .status-connecting { background: #FF9800; }
-  .status-connected { background: #4CAF50; }
-  .status-error { background: #f44336; }
-  .status-waiting { background: #9C27B0; }
+  button:hover { background: #555; color: #fff; }
+  #status { margin-top: 20px; font-size: 18px; color: #0ff; text-shadow: 0 0 8px #0ff; }
 </style>
 </head>
 <body>
-<h1>📱 視聴ページ</h1>
-
-<div id="status" class="status-disconnected">未接続</div>
-
+<h1>📡 NieR Stream Viewer</h1>
 <video id="remote" autoplay playsinline></video>
-
-<div>
-  <button id="connectBtn">接続して視聴</button>
-</div>
-
+<div id="status">接続待機中...</div>
+<button id="connectBtn">接続開始</button>
 <script>
 const WS_URL = "wss://k-divenohtml.onrender.com";
-const ICE_SERVERS = [
-  { urls: 'stun:stun.l.google.com:19302' },
-  { urls: 'stun:stun1.l.google.com:19302' }
-];
+const ICE_SERVERS = [{ urls: "stun:stun.l.google.com:19302" }];
 
-let ws = null;
-let pc = null;
-let reconnectInterval = null;
-
-const statusDiv = document.getElementById('status');
-const connectBtn = document.getElementById('connectBtn');
+let ws, pc;
 const video = document.getElementById('remote');
+const statusDiv = document.getElementById('status');
 
-function updateStatus(text, className) {
-  statusDiv.textContent = text;
-  statusDiv.className = className;
-}
+function updateStatus(t,c="#0ff"){statusDiv.textContent=t;statusDiv.style.color=c;statusDiv.style.textShadow=`0 0 10px ${c}`;}
 
-function connectWebSocket() {
-  if (ws && ws.readyState === WebSocket.OPEN) return;
-  
-  updateStatus('サーバーに接続中...', 'status-connecting');
+function connect(){
   ws = new WebSocket(WS_URL);
-  
   ws.onopen = () => {
-    console.log('WebSocket connected');
-    updateStatus('配信待機中...', 'status-waiting');
-    
-    if (reconnectInterval) {
-      clearInterval(reconnectInterval);
-      reconnectInterval = null;
-    }
-    
-    // 視聴者として登録
-    console.log('Sending viewer registration');
     ws.send(JSON.stringify({ viewer: true }));
+    updateStatus("通信回線：ONLINE");
   };
-  
-  ws.onmessage = async (e) => {
-    try {
-      const msg = JSON.parse(e.data);
-      
-      if (msg.broadcasterDisconnected) {
-        updateStatus('配信が終了しました', 'status-error');
-        if (pc) {
-          pc.close();
-          pc = null;
-        }
-        video.srcObject = null;
-        connectBtn.disabled = false;
-        return;
-      }
-      
-      if (msg.offer) {
-        console.log('Offer received from broadcaster');
-        updateStatus('配信に接続中...', 'status-connecting');
-        
-        // PeerConnection作成
-        if (pc) pc.close();
-        pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
-        
-        // リモートストリーム受信
-        pc.ontrack = (e) => {
-          console.log('Remote track received');
-          video.srcObject = e.streams[0];
-          updateStatus('✅ 視聴中', 'status-connected');
-        };
-        
-        // ICE候補の処理
-        pc.onicecandidate = (e) => {
-          if (e.candidate && ws && ws.readyState === WebSocket.OPEN) {
-            ws.send(JSON.stringify({ candidate: e.candidate }));
-          }
-        };
-        
-        pc.oniceconnectionstatechange = () => {
-          console.log('ICE connection state:', pc.iceConnectionState);
-          if (pc.iceConnectionState === 'disconnected' || pc.iceConnectionState === 'failed') {
-            updateStatus('接続が切れました', 'status-error');
-            video.srcObject = null;
-          }
-        };
-        
-        // Offer設定とAnswer作成
-        await pc.setRemoteDescription(new RTCSessionDescription(msg.offer));
-        const answer = await pc.createAnswer();
-        await pc.setLocalDescription(answer);
-        
-        // Answerを送信
-        if (ws && ws.readyState === WebSocket.OPEN) {
-          ws.send(JSON.stringify({ answer }));
-        }
-        
-        connectBtn.disabled = true;
-      } else if (msg.candidate && pc) {
-        await pc.addIceCandidate(new RTCIceCandidate(msg.candidate));
-      }
-    } catch (err) {
-      console.error('Error handling message:', err);
-      updateStatus('エラー: ' + err.message, 'status-error');
+  ws.onmessage = async e => {
+    const msg = JSON.parse(e.data);
+    if (msg.broadcasterDisconnected){
+      updateStatus("配信終了", "#f33");
+      video.srcObject=null;
+      return;
     }
-  };
-  
-  ws.onerror = (err) => {
-    console.error('WebSocket error:', err);
-    updateStatus('接続エラー', 'status-error');
-  };
-  
-  ws.onclose = () => {
-    console.log('WebSocket closed');
-    updateStatus('切断されました', 'status-disconnected');
-    connectBtn.disabled = false;
-    
-    // 自動再接続
-    if (!reconnectInterval) {
-      reconnectInterval = setInterval(() => {
-        console.log('Attempting to reconnect...');
-        connectWebSocket();
-      }, 3000);
+    if (msg.offer){
+      pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
+      pc.ontrack = e => { video.srcObject = e.streams[0]; video.play().catch(()=>{}); updateStatus("視聴中...", "#0f0"); };
+      await pc.setRemoteDescription(msg.offer);
+      const answer = await pc.createAnswer();
+      await pc.setLocalDescription(answer);
+      ws.send(JSON.stringify({ answer }));
     }
+    if (msg.candidate && pc) await pc.addIceCandidate(msg.candidate);
   };
+  ws.onclose = () => updateStatus("通信切断", "#f33");
 }
-
-connectBtn.onclick = () => {
-  connectWebSocket();
-};
-
-// ページ離脱時のクリーンアップ
-window.addEventListener('beforeunload', () => {
-  if (pc) pc.close();
-  if (ws) ws.close();
-});
-
-// 初期接続
-connectWebSocket();
+document.getElementById('connectBtn').onclick = connect;
 </script>
 </body>
 </html>
