@@ -2,10 +2,23 @@
 import express from "express";
 import { WebSocketServer } from "ws";
 import http from "http";
+import path from "path";
+import { fileURLToPath } from "url";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const app = express();
 const server = http.createServer(app);
 const wss = new WebSocketServer({ server });
+
+// ✅ public フォルダ内を静的配信
+app.use(express.static(path.join(__dirname, "public")));
+
+// デフォルトルートを index.html に
+app.get("/", (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "index.html"));
+});
 
 let broadcaster = null;
 const viewers = new Set();
@@ -18,7 +31,6 @@ wss.on("connection", (ws) => {
     if (data.offer) {
       broadcaster = ws;
       console.log("📡 Broadcaster connected");
-      // 視聴者全員にOfferを送信
       viewers.forEach(v => v.send(JSON.stringify({ offer: data.offer })));
     }
 
@@ -59,4 +71,4 @@ wss.on("connection", (ws) => {
 });
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => console.log(`✅ WebSocket Server running on port ${PORT}`));
+server.listen(PORT, () => console.log(`✅ Server running on port ${PORT}`));
