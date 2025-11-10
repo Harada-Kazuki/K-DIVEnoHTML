@@ -183,18 +183,13 @@ function connectWebSocket() {
         pc.ontrack = (e) => {
           log('📺 映像トラックを受信');
           log(`📺 トラック情報: kind=${e.track.kind}, enabled=${e.track.enabled}, readyState=${e.track.readyState}`);
-          video.srcObject = e.streams[0];
-          updateStatus('✅ 視聴中', 'status-connected');
           
-          // ビデオ再生確認
-          video.onloadedmetadata = () => {
-            log('✅ ビデオメタデータ読み込み完了');
-            video.play().then(() => {
-              log('✅ ビデオ再生開始');
-            }).catch(err => {
-              log('❌ ビデオ再生エラー: ' + err.message);
-            });
-          };
+          if (video.srcObject !== e.streams[0]) {
+            video.srcObject = e.streams[0];
+            log('✅ ビデオソース設定完了');
+          }
+          
+          updateStatus('✅ 視聴中', 'status-connected');
         };
         
         // ICE候補の処理
