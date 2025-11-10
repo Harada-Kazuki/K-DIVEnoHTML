@@ -5,87 +5,260 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>配信者 | OBS VirtualCam → WebRTC</title>
 <style>
-  body {
-    background: #111;
-    color: #eee;
-    text-align: center;
-    font-family: sans-serif;
+  @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&display=swap');
+  
+  * {
     margin: 0;
-    padding: 20px;
+    padding: 0;
+    box-sizing: border-box;
   }
-  #local {
-    width: 90%;
-    max-width: 800px;
-    border-radius: 12px;
-    background: #000;
-    margin: 20px auto;
+  
+  body {
+    background: #0a0a0a;
+    color: #d4c5aa;
+    font-family: 'Orbitron', monospace;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 30px 20px;
+    position: relative;
+    overflow-x: hidden;
   }
-  button {
-    padding: 12px 30px;
-    font-size: 16px;
-    border-radius: 8px;
-    border: none;
-    background: #4CAF50;
-    color: white;
-    cursor: pointer;
-    margin: 10px;
+  
+  body::before {
+    content: '';
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: 
+      linear-gradient(90deg, transparent 0%, rgba(212, 197, 170, 0.03) 50%, transparent 100%),
+      repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(212, 197, 170, 0.05) 2px, rgba(212, 197, 170, 0.05) 4px);
+    pointer-events: none;
+    z-index: 0;
   }
-  button:disabled {
-    background: #666;
-    cursor: not-allowed;
+  
+  .container {
+    position: relative;
+    z-index: 1;
+    max-width: 1000px;
+    width: 100%;
   }
-  button:hover:not(:disabled) {
-    background: #45a049;
+  
+  h1 {
+    font-size: 2.5em;
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: 4px;
+    margin-bottom: 10px;
+    text-shadow: 0 0 20px rgba(212, 197, 170, 0.5);
+    border-left: 4px solid #d4c5aa;
+    padding-left: 20px;
   }
-  #stopBtn {
-    background: #f44336;
+  
+  .subtitle {
+    font-size: 0.9em;
+    color: #8a8174;
+    margin-bottom: 30px;
+    padding-left: 24px;
+    letter-spacing: 2px;
   }
-  #stopBtn:hover:not(:disabled) {
-    background: #da190b;
-  }
+  
   #status {
-    margin: 20px;
-    padding: 10px;
-    border-radius: 8px;
     display: inline-block;
+    padding: 12px 30px;
+    margin: 20px 0;
+    border: 2px solid #d4c5aa;
+    background: rgba(10, 10, 10, 0.8);
+    font-size: 0.9em;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    position: relative;
+    clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px);
   }
-  .status-disconnected { background: #666; }
-  .status-connected { background: #2196F3; }
-  .status-streaming { background: #4CAF50; }
-  .status-error { background: #f44336; }
+  
+  .status-disconnected { 
+    border-color: #555;
+    color: #555;
+  }
+  .status-connected { 
+    border-color: #5ac8fa;
+    color: #5ac8fa;
+    box-shadow: 0 0 20px rgba(90, 200, 250, 0.3);
+  }
+  .status-streaming { 
+    border-color: #d4c5aa;
+    color: #d4c5aa;
+    box-shadow: 0 0 20px rgba(212, 197, 170, 0.4);
+    animation: pulse 2s infinite;
+  }
+  .status-error { 
+    border-color: #ff6b6b;
+    color: #ff6b6b;
+    box-shadow: 0 0 20px rgba(255, 107, 107, 0.3);
+  }
+  
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.7; }
+  }
+  
+  #local {
+    width: 100%;
+    max-width: 900px;
+    background: #000;
+    margin: 30px auto;
+    border: 3px solid #d4c5aa;
+    box-shadow: 
+      0 0 30px rgba(212, 197, 170, 0.2),
+      inset 0 0 50px rgba(0, 0, 0, 0.5);
+    clip-path: polygon(20px 0, 100% 0, 100% calc(100% - 20px), calc(100% - 20px) 100%, 0 100%, 0 20px);
+  }
+  
+  .controls {
+    display: flex;
+    gap: 20px;
+    justify-content: center;
+    margin: 30px 0;
+    flex-wrap: wrap;
+  }
+  
+  button {
+    padding: 15px 40px;
+    font-size: 0.95em;
+    font-family: 'Orbitron', monospace;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    border: 2px solid #d4c5aa;
+    background: rgba(10, 10, 10, 0.9);
+    color: #d4c5aa;
+    cursor: pointer;
+    transition: all 0.3s;
+    clip-path: polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px);
+    position: relative;
+  }
+  
+  button::before {
+    content: '';
+    position: absolute;
+    top: -2px;
+    left: -2px;
+    right: -2px;
+    bottom: -2px;
+    background: linear-gradient(45deg, transparent, rgba(212, 197, 170, 0.2), transparent);
+    clip-path: polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px);
+    opacity: 0;
+    transition: opacity 0.3s;
+    z-index: -1;
+  }
+  
+  button:hover:not(:disabled)::before {
+    opacity: 1;
+  }
+  
+  button:hover:not(:disabled) {
+    background: rgba(212, 197, 170, 0.1);
+    box-shadow: 0 0 20px rgba(212, 197, 170, 0.3);
+    transform: translateY(-2px);
+  }
+  
+  button:disabled {
+    border-color: #333;
+    color: #333;
+    cursor: not-allowed;
+    background: rgba(10, 10, 10, 0.5);
+  }
+  
+  #stopBtn {
+    border-color: #ff6b6b;
+    color: #ff6b6b;
+  }
+  
+  #stopBtn:hover:not(:disabled) {
+    background: rgba(255, 107, 107, 0.1);
+    box-shadow: 0 0 20px rgba(255, 107, 107, 0.3);
+  }
+  
+  .info-panel {
+    display: flex;
+    gap: 30px;
+    justify-content: center;
+    margin: 20px 0;
+    flex-wrap: wrap;
+  }
+  
+  .info-item {
+    padding: 10px 20px;
+    border-left: 3px solid #d4c5aa;
+    background: rgba(212, 197, 170, 0.05);
+    font-size: 0.9em;
+    letter-spacing: 1px;
+  }
+  
   .debug-info {
-    margin-top: 20px;
-    padding: 10px;
-    background: #222;
-    border-radius: 8px;
-    font-size: 12px;
+    margin-top: 40px;
+    padding: 20px;
+    background: rgba(0, 0, 0, 0.6);
+    border: 1px solid #333;
+    font-size: 11px;
     text-align: left;
-    max-width: 800px;
+    max-width: 900px;
     margin-left: auto;
     margin-right: auto;
+    font-family: 'Courier New', monospace;
+    color: #8a8174;
+    clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px);
+    max-height: 300px;
+    overflow-y: auto;
+  }
+  
+  .debug-info::-webkit-scrollbar {
+    width: 8px;
+  }
+  
+  .debug-info::-webkit-scrollbar-track {
+    background: #0a0a0a;
+  }
+  
+  .debug-info::-webkit-scrollbar-thumb {
+    background: #333;
+    border-radius: 4px;
+  }
+  
+  .debug-info strong {
+    color: #d4c5aa;
+    font-size: 12px;
+    letter-spacing: 2px;
+    display: block;
+    margin-bottom: 10px;
   }
 </style>
 </head>
 <body>
-<h1>🎥 配信者ページ</h1>
-<p>OBSの仮想カメラをONにして「配信開始」をクリック</p>
+<div class="container">
+  <h1>Broadcaster</h1>
+  <p class="subtitle">OBS Virtual Camera Stream</p>
 
-<div id="status" class="status-disconnected">未接続</div>
+  <div id="status" class="status-disconnected">System Offline</div>
 
-<video id="local" autoplay playsinline muted></video>
+  <video id="local" autoplay playsinline muted></video>
 
-<div>
-  <button id="startBtn">配信開始</button>
-  <button id="stopBtn" disabled>配信停止</button>
-</div>
+  <div class="controls">
+    <button id="startBtn">Start Broadcast</button>
+    <button id="stopBtn" disabled>Stop Broadcast</button>
+  </div>
 
-<div style="margin-top: 20px; font-size: 14px; color: #aaa;">
-  <p id="viewerCount">視聴者: 0人</p>
-</div>
+  <div class="info-panel">
+    <div class="info-item" id="viewerCount">Viewers: 0</div>
+  </div>
 
-<div class="debug-info">
-  <div><strong>デバッグ情報:</strong></div>
-  <div id="debugLog"></div>
+  <div class="debug-info">
+    <strong>// System Log</strong>
+    <div id="debugLog"></div>
+  </div>
 </div>
 
 <script>
@@ -130,19 +303,29 @@ function log(msg) {
 }
 
 function updateStatus(text, className) {
-  statusDiv.textContent = text;
+  const statusMap = {
+    '接続中...': 'Connecting...',
+    '接続済み (配信待機中)': 'Standby Mode',
+    'カメラ起動中...': 'Camera Initializing...',
+    '配信準備完了': 'Ready to Broadcast',
+    '🔴 配信中': '[ LIVE ]',
+    '切断されました': 'Connection Lost',
+    '配信停止': 'Broadcast Ended',
+    '接続エラー': 'Connection Error'
+  };
+  statusDiv.textContent = statusMap[text] || text;
   statusDiv.className = className;
 }
 
 function updateViewerCount() {
-  viewerCount.textContent = `視聴者: ${peerConnections.size}人`;
+  viewerCount.textContent = `Viewers: ${peerConnections.size}`;
 }
 
 function connectWebSocket() {
   if (ws && ws.readyState === WebSocket.OPEN) return;
   
   updateStatus('接続中...', 'status-connected');
-  log('🔄 WebSocket接続を試行中...');
+  log('WebSocket接続を試行中...');
   ws = new WebSocket(WS_URL);
   
   ws.onopen = () => {
@@ -191,7 +374,7 @@ function connectWebSocket() {
       
       // 視聴者が切断
       else if (msg.type === 'viewerDisconnected') {
-        log(`👋 視聴者 ${msg.viewerId} が切断`);
+        log(`視聴者 ${msg.viewerId} が切断`);
         const pc = peerConnections.get(msg.viewerId);
         if (pc) {
           pc.close();
@@ -287,7 +470,7 @@ async function createPeerConnection(viewerId) {
 
 async function startBroadcast() {
   try {
-    log('🎬 配信開始処理を開始');
+    log('配信開始処理を開始');
     updateStatus('カメラ起動中...', 'status-connected');
     
     // カメラ取得
@@ -300,7 +483,7 @@ async function startBroadcast() {
       audio: false
     });
     
-    log('📹 カメラ取得成功');
+    log('カメラ取得成功');
     video.srcObject = localStream;
     
     updateStatus('配信準備完了', 'status-streaming');
@@ -350,7 +533,7 @@ window.addEventListener('beforeunload', () => {
 });
 
 connectWebSocket();
-log('🚀 配信者ページ読み込み完了');
+log('配信者ページ読み込み完了');
 </script>
 </body>
 </html>
