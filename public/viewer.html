@@ -227,12 +227,15 @@
 
   <div class="controls">
     <button id="connectBtn">Connect & Watch</button>
+    <button id="fullscreenBtn">Fullscreen</button>
+  </div>
   </div>
 
   <div class="debug-info">
     <strong>// System Log</strong>
     <div id="debugLog"></div>
   </div>
+
 </div>
 
 <script>
@@ -457,6 +460,30 @@ window.addEventListener('beforeunload', () => {
 
 // 自動接続はしない
 log('視聴者ページ読み込み完了');
+
+const fullscreenBtn = document.getElementById('fullscreenBtn');
+
+fullscreenBtn.onclick = () => {
+  if (!document.fullscreenElement) {
+    video.requestFullscreen().catch(err => {
+      log('❌ フルスクリーンエラー: ' + err.message);
+    });
+  } else {
+    document.exitFullscreen();
+  }
+};
+
+// フルスクリーン切替時のログ
+document.addEventListener('fullscreenchange', () => {
+  if (document.fullscreenElement) {
+    log('🖥️ フルスクリーンモードに切り替え');
+    fullscreenBtn.textContent = 'Exit Fullscreen';
+  } else {
+    log('↩️ 通常表示に戻りました');
+    fullscreenBtn.textContent = 'Fullscreen';
+  }
+});
+
 </script>
 </body>
 </html>
