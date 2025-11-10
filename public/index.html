@@ -53,6 +53,17 @@
   .status-connected { background: #2196F3; }
   .status-streaming { background: #4CAF50; }
   .status-error { background: #f44336; }
+  .debug-info {
+    margin-top: 20px;
+    padding: 10px;
+    background: #222;
+    border-radius: 8px;
+    font-size: 12px;
+    text-align: left;
+    max-width: 800px;
+    margin-left: auto;
+    margin-right: auto;
+  }
 </style>
 </head>
 <body>
@@ -70,24 +81,58 @@
 
 <div style="margin-top: 20px; font-size: 14px; color: #aaa;">
   <p id="viewerCount">視聴者: 0人</p>
+  <p id="connectionState">接続状態: -</p>
+</div>
+
+<div class="debug-info">
+  <div><strong>デバッグ情報:</strong></div>
+  <div id="debugLog"></div>
 </div>
 
 <script>
-    const WS_URL = "wss://k-divenohtml.onrender.com";
+const WS_URL = "wss://k-divenohtml.onrender.com";
+
+// ✅ TURNサーバーを追加（NAT越え改善）
 const ICE_SERVERS = [
   { urls: 'stun:stun.l.google.com:19302' },
-  { urls: 'stun:stun1.l.google.com:19302' }
+  { urls: 'stun:stun1.l.google.com:19302' },
+  { urls: 'stun:stun2.l.google.com:19302' },
+  // 無料のTURNサーバー（制限あり）
+  {
+    urls: 'turn:openrelay.metered.ca:80',
+    username: 'openrelayproject',
+    credential: 'openrelayproject'
+  },
+  {
+    urls: 'turn:openrelay.metered.ca:443',
+    username: 'openrelayproject',
+    credential: 'openrelayproject'
+  }
 ];
 
 let ws = null;
 let pc = null;
 let localStream = null;
 let reconnectInterval = null;
+let connectionTimeout = null;
 
 const statusDiv = document.getElementById('status');
 const startBtn = document.getElementById('startBtn');
 const stopBtn = document.getElementById('stopBtn');
 const video = document.getElementById('local');
+const debugLog = document.getElementById('debugLog');
+const connectionState = document.getElementById('connectionState');
+
+function log(msg) {
+  console.log(msg);
+  const time = new Date().toLocaleTimeString();
+  debugLog.innerHTML = `[${time}] ${msg}<br>` + debugLog.innerHTML;
+  // 最新20件のみ保持
+  const lines = debugLog.innerHTML.split('<br>');
+  if (lines.length > 20) {
+    debugLog.innerHTML = lines.slice(0, 20).join('<br>');
+  }
+}
 
 function updateStatus(text, className) {
   statusDiv.textContent = text;
@@ -98,10 +143,11 @@ function connectWebSocket() {
   if (ws && ws.readyState === WebSocket.OPEN) return;
   
   updateStatus('接続中...', 'status-connected');
+  log('🔄 WebSocket接続を試行中...');
   ws = new WebSocket(WS_URL);
   
   ws.onopen = () => {
-    console.log('✅ WebSocket connected');
+    log('✅ WebSocket接続成功');
     updateStatus('接続済み (配信待機中)', 'status-connected');
     if (reconnectInterval) {
       clearInterval(reconnectInterval);
@@ -112,33 +158,32 @@ function connectWebSocket() {
   ws.onmessage = async (e) => {
     try {
       const msg = JSON.parse(e.data);
-      console.log('📨 Received message:', msg);
       
       if (msg.answer && pc) {
-        console.log('✅ Answer received from viewer');
+        log('📥 視聴者からAnswerを受信');
         await pc.setRemoteDescription(new RTCSessionDescription(msg.answer));
       } else if (msg.candidate && pc) {
-        console.log('🧊 ICE candidate received');
+        log('🧊 視聴者からICE候補を受信');
         await pc.addIceCandidate(new RTCIceCandidate(msg.candidate));
       }
     } catch (err) {
-      console.error('❌ Error handling message:', err);
+      log('❌ メッセージ処理エラー: ' + err.message);
     }
   };
   
   ws.onerror = (err) => {
-    console.error('WebSocket error:', err);
+    log('❌ WebSocketエラー');
     updateStatus('接続エラー', 'status-error');
   };
   
   ws.onclose = () => {
-    console.log('🔌 WebSocket closed');
+    log('🔌 WebSocket切断');
     updateStatus('切断されました', 'status-disconnected');
     
     // 自動再接続
     if (!reconnectInterval) {
       reconnectInterval = setInterval(() => {
-        console.log('🔄 Attempting to reconnect...');
+        log('🔄 自動再接続を試行...');
         connectWebSocket();
       }, 3000);
     }
@@ -147,63 +192,97 @@ function connectWebSocket() {
 
 async function startBroadcast() {
   try {
-    console.log('🎬 Starting broadcast...');
+    log('🎬 配信開始処理を開始');
     updateStatus('カメラ起動中...', 'status-connected');
+    
+    // ✅ タイムアウト設定（30秒）
+    connectionTimeout = setTimeout(() => {
+      log('⏱️ 接続タイムアウト（30秒経過）');
+      updateStatus('接続タイムアウト', 'status-error');
+      alert('接続がタイムアウトしました。もう一度お試しください。');
+      stopBroadcast();
+    }, 30000);
     
     // カメラ取得
     localStream = await navigator.mediaDevices.getUserMedia({
       video: {
         width: { ideal: 1280 },
-        height: { ideal: 720 }
+        height: { ideal: 720 },
+        frameRate: { ideal: 30 }
       },
       audio: false
     });
     
-    console.log('📹 Camera acquired');
+    log('📹 カメラ取得成功');
     video.srcObject = localStream;
     
     // PeerConnection作成
-    pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
-    console.log('🔗 PeerConnection created');
+    pc = new RTCPeerConnection({ 
+      iceServers: ICE_SERVERS,
+      // ✅ 接続設定の最適化
+      iceCandidatePoolSize: 10,
+      bundlePolicy: 'max-bundle',
+      rtcpMuxPolicy: 'require'
+    });
+    log('🔗 PeerConnection作成');
     
     // トラック追加
     localStream.getTracks().forEach(track => {
       pc.addTrack(track, localStream);
-      console.log('➕ Track added:', track.kind);
+      log(`➕ トラック追加: ${track.kind}`);
     });
     
     // ICE候補の処理
+    let iceCandidateCount = 0;
     pc.onicecandidate = (e) => {
       if (e.candidate && ws && ws.readyState === WebSocket.OPEN) {
-        console.log('🧊 Sending ICE candidate');
+        iceCandidateCount++;
+        log(`🧊 ICE候補送信 #${iceCandidateCount}`);
         ws.send(JSON.stringify({ candidate: e.candidate }));
       } else if (!e.candidate) {
-        console.log('✅ ICE gathering complete');
+        log('✅ ICE候補の収集完了');
       }
     };
     
     pc.oniceconnectionstatechange = () => {
-      console.log('🔄 ICE connection state:', pc.iceConnectionState);
-      if (pc.iceConnectionState === 'connected') {
+      const state = pc.iceConnectionState;
+      log(`🔄 ICE接続状態: ${state}`);
+      connectionState.textContent = `接続状態: ${state}`;
+      
+      if (state === 'connected' || state === 'completed') {
         updateStatus('🔴 配信中', 'status-streaming');
-      } else if (pc.iceConnectionState === 'disconnected' || pc.iceConnectionState === 'failed') {
-        updateStatus('接続が切れました', 'status-error');
+        if (connectionTimeout) {
+          clearTimeout(connectionTimeout);
+          connectionTimeout = null;
+        }
+      } else if (state === 'disconnected') {
+        updateStatus('一時的に切断', 'status-error');
+      } else if (state === 'failed') {
+        log('❌ ICE接続失敗');
+        updateStatus('接続失敗', 'status-error');
       }
     };
     
+    // ✅ 接続品質の監視
+    pc.onconnectionstatechange = () => {
+      log(`🔄 PeerConnection状態: ${pc.connectionState}`);
+    };
+    
     // Offer作成
-    console.log('📝 Creating offer...');
-    const offer = await pc.createOffer();
+    log('📝 Offer作成中...');
+    const offer = await pc.createOffer({
+      offerToReceiveVideo: false,
+      offerToReceiveAudio: false
+    });
     await pc.setLocalDescription(offer);
-    console.log('✅ Local description set');
+    log('✅ LocalDescription設定完了');
     
     // Offerを送信
     if (ws && ws.readyState === WebSocket.OPEN) {
-      console.log('📤 Sending offer to server');
+      log('📤 Offerをサーバーに送信');
       ws.send(JSON.stringify({ offer }));
-      updateStatus('配信準備完了', 'status-streaming');
+      updateStatus('配信準備完了 (視聴者待ち)', 'status-streaming');
     } else {
-      console.error('❌ WebSocket not ready');
       throw new Error('WebSocket接続がありません');
     }
     
@@ -211,16 +290,27 @@ async function startBroadcast() {
     stopBtn.disabled = false;
     
   } catch (err) {
-    console.error('❌ Error starting broadcast:', err);
+    log('❌ 配信開始エラー: ' + err.message);
     updateStatus('エラー: ' + err.message, 'status-error');
-    alert('カメラの起動に失敗しました。OBSの仮想カメラがONになっているか確認してください。');
+    alert('カメラの起動に失敗しました。\n\nOBSの仮想カメラがONになっているか確認してください。\n他のアプリでカメラを使用していないかも確認してください。');
+    stopBroadcast();
   }
 }
 
 function stopBroadcast() {
+  log('🛑 配信停止');
+  
+  if (connectionTimeout) {
+    clearTimeout(connectionTimeout);
+    connectionTimeout = null;
+  }
+  
   // ストリーム停止
   if (localStream) {
-    localStream.getTracks().forEach(track => track.stop());
+    localStream.getTracks().forEach(track => {
+      track.stop();
+      log(`⏹️ トラック停止: ${track.kind}`);
+    });
     localStream = null;
   }
   
@@ -232,6 +322,7 @@ function stopBroadcast() {
   
   video.srcObject = null;
   updateStatus('配信停止', 'status-connected');
+  connectionState.textContent = '接続状態: -';
   
   startBtn.disabled = false;
   stopBtn.disabled = true;
@@ -248,6 +339,7 @@ window.addEventListener('beforeunload', () => {
 
 // 初期接続
 connectWebSocket();
+log('🚀 配信者ページ読み込み完了');
 </script>
 </body>
 </html>
