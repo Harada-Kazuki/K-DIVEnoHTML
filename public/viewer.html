@@ -62,19 +62,19 @@
 </div>
 
 <script>
-const WS_URL = "wss://k-divenohtml.onrender.com"; // ← あなたのRenderのURL
+    const WS_URL = "wss://k-divenohtml.onrender.com";
 const ICE_SERVERS = [
-  { urls: "stun:stun.l.google.com:19302" },
-  { urls: "stun:stun1.l.google.com:19302" },
+  { urls: 'stun:stun.l.google.com:19302' },
+  { urls: 'stun:stun1.l.google.com:19302' }
 ];
 
 let ws = null;
 let pc = null;
 let reconnectInterval = null;
 
-const statusDiv = document.getElementById("status");
-const connectBtn = document.getElementById("connectBtn");
-const video = document.getElementById("remote");
+const statusDiv = document.getElementById('status');
+const connectBtn = document.getElementById('connectBtn');
+const video = document.getElementById('remote');
 
 function updateStatus(text, className) {
   statusDiv.textContent = text;
@@ -83,27 +83,30 @@ function updateStatus(text, className) {
 
 function connectWebSocket() {
   if (ws && ws.readyState === WebSocket.OPEN) return;
-
-  updateStatus("サーバーに接続中...", "status-connecting");
+  
+  updateStatus('サーバーに接続中...', 'status-connecting');
   ws = new WebSocket(WS_URL);
-
+  
   ws.onopen = () => {
-    console.log("🌐 WebSocket connected");
-    updateStatus("配信待機中...", "status-waiting");
+    console.log('WebSocket connected');
+    updateStatus('配信待機中...', 'status-waiting');
+    
     if (reconnectInterval) {
       clearInterval(reconnectInterval);
       reconnectInterval = null;
     }
-    ws.send(JSON.stringify({ viewer: true })); // 👀 視聴者登録
+    
+    // 視聴者として登録
+    console.log('Sending viewer registration');
+    ws.send(JSON.stringify({ viewer: true }));
   };
-
+  
   ws.onmessage = async (e) => {
     try {
       const msg = JSON.parse(e.data);
-
-      // --- 配信終了通知 ---
+      
       if (msg.broadcasterDisconnected) {
-        updateStatus("配信が終了しました", "status-error");
+        updateStatus('配信が終了しました', 'status-error');
         if (pc) {
           pc.close();
           pc = null;
@@ -112,118 +115,83 @@ function connectWebSocket() {
         connectBtn.disabled = false;
         return;
       }
-
-      // --- Offer受信 ---
+      
       if (msg.offer) {
-        console.log("📡 Offer received from broadcaster");
-
-        // 古い接続を閉じる
-        if (pc) {
-          try { pc.close(); } catch {}
-          pc = null;
-        }
-
-        // 新しいPeerConnection作成
+        console.log('Offer received from broadcaster');
+        updateStatus('配信に接続中...', 'status-connecting');
+        
+        // PeerConnection作成
+        if (pc) pc.close();
         pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
-
-        // リモートトラックを受信
+        
+        // リモートストリーム受信
         pc.ontrack = (e) => {
-          console.log("🎞 Remote track received");
+          console.log('Remote track received');
           video.srcObject = e.streams[0];
-          video.play().then(() => {
-            console.log("▶️ 再生開始");
-            updateStatus("✅ 視聴中", "status-connected");
-          }).catch((err) => {
-            console.warn("⚠️ Autoplay blocked:", err);
-            updateStatus("再生ブロック: クリックで再開", "status-error");
-          });
+          updateStatus('✅ 視聴中', 'status-connected');
         };
-
-        // ICE候補を送信
+        
+        // ICE候補の処理
         pc.onicecandidate = (e) => {
           if (e.candidate && ws && ws.readyState === WebSocket.OPEN) {
             ws.send(JSON.stringify({ candidate: e.candidate }));
           }
         };
-
-        // 状態監視
+        
         pc.oniceconnectionstatechange = () => {
-          console.log("ICE state:", pc.iceConnectionState);
-          if (
-            pc.iceConnectionState === "disconnected" ||
-            pc.iceConnectionState === "failed"
-          ) {
-            updateStatus("接続が切れました", "status-error");
+          console.log('ICE connection state:', pc.iceConnectionState);
+          if (pc.iceConnectionState === 'disconnected' || pc.iceConnectionState === 'failed') {
+            updateStatus('接続が切れました', 'status-error');
             video.srcObject = null;
           }
         };
-
-        // OfferをセットしてAnswerを作成
+        
+        // Offer設定とAnswer作成
         await pc.setRemoteDescription(new RTCSessionDescription(msg.offer));
         const answer = await pc.createAnswer();
         await pc.setLocalDescription(answer);
-        ws.send(JSON.stringify({ answer }));
-        connectBtn.disabled = true;
-        return;
-      }
-
-      // --- ICE candidateを受信 ---
-      if (msg.candidate && pc) {
-        try {
-          await pc.addIceCandidate(new RTCIceCandidate(msg.candidate));
-        } catch (err) {
-          console.error("❌ Failed to add ICE candidate:", err);
+        
+        // Answerを送信
+        if (ws && ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({ answer }));
         }
-        return;
-      }
-
-      // --- 配信待機 ---
-      if (msg.waiting) {
-        updateStatus("配信待機中...", "status-waiting");
-        connectBtn.disabled = false;
-        return;
+        
+        connectBtn.disabled = true;
+      } else if (msg.candidate && pc) {
+        await pc.addIceCandidate(new RTCIceCandidate(msg.candidate));
       }
     } catch (err) {
-      console.error("❌ Error handling message:", err);
-      updateStatus("エラー: " + err.message, "status-error");
+      console.error('Error handling message:', err);
+      updateStatus('エラー: ' + err.message, 'status-error');
     }
   };
-
+  
   ws.onerror = (err) => {
-    console.error("WebSocket error:", err);
-    updateStatus("接続エラー", "status-error");
+    console.error('WebSocket error:', err);
+    updateStatus('接続エラー', 'status-error');
   };
-
+  
   ws.onclose = () => {
-    console.log("🔌 WebSocket closed");
-    updateStatus("切断されました", "status-disconnected");
+    console.log('WebSocket closed');
+    updateStatus('切断されました', 'status-disconnected');
     connectBtn.disabled = false;
-
-    // 再接続リトライ
+    
+    // 自動再接続
     if (!reconnectInterval) {
       reconnectInterval = setInterval(() => {
-        console.log("🔄 Attempting to reconnect...");
+        console.log('Attempting to reconnect...');
         connectWebSocket();
       }, 3000);
     }
   };
 }
 
-// ✅ ボタンで接続＋再生も許可
 connectBtn.onclick = () => {
   connectWebSocket();
-  if (video && video.srcObject) {
-    video.play().then(() => {
-      console.log("▶️ 再生開始（クリックによる許可）");
-      updateStatus("✅ 視聴中", "status-connected");
-    }).catch(err => {
-      console.warn("⚠️ 再生失敗:", err);
-    });
-  }
 };
 
 // ページ離脱時のクリーンアップ
-window.addEventListener("beforeunload", () => {
+window.addEventListener('beforeunload', () => {
   if (pc) pc.close();
   if (ws) ws.close();
 });
