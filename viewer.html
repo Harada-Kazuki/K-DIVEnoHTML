@@ -97,6 +97,7 @@ function connectWebSocket() {
     }
     
     // 視聴者として登録
+    console.log('Sending viewer registration');
     ws.send(JSON.stringify({ viewer: true }));
   };
   
