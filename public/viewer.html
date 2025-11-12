@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>配信者 | OBS VirtualCam → WebRTC</title>
+<title>視聴者 | WebRTC Viewer</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&display=swap');
   
@@ -83,29 +83,34 @@
     border-color: #555;
     color: #555;
   }
-  .status-connected { 
-    border-color: #5ac8fa;
-    color: #5ac8fa;
-    box-shadow: 0 0 20px rgba(90, 200, 250, 0.3);
+  .status-connecting { 
+    border-color: #ff9f43;
+    color: #ff9f43;
+    box-shadow: 0 0 20px rgba(255, 159, 67, 0.3);
+    animation: pulse 1.5s infinite;
   }
-  .status-streaming { 
+  .status-connected { 
     border-color: #d4c5aa;
     color: #d4c5aa;
     box-shadow: 0 0 20px rgba(212, 197, 170, 0.4);
-    animation: pulse 2s infinite;
   }
   .status-error { 
     border-color: #ff6b6b;
     color: #ff6b6b;
     box-shadow: 0 0 20px rgba(255, 107, 107, 0.3);
   }
+  .status-waiting { 
+    border-color: #5ac8fa;
+    color: #5ac8fa;
+    box-shadow: 0 0 20px rgba(90, 200, 250, 0.3);
+  }
   
   @keyframes pulse {
     0%, 100% { opacity: 1; }
-    50% { opacity: 0.7; }
+    50% { opacity: 0.6; }
   }
   
-  #local {
+  #remote {
     width: 100%;
     max-width: 900px;
     background: #000;
@@ -115,6 +120,85 @@
       0 0 30px rgba(212, 197, 170, 0.2),
       inset 0 0 50px rgba(0, 0, 0, 0.5);
     clip-path: polygon(20px 0, 100% 0, 100% calc(100% - 20px), calc(100% - 20px) 100%, 0 100%, 0 20px);
+    position: relative;
+    cursor: pointer;
+  }
+  
+  #remote:fullscreen {
+    max-width: 100vw;
+    max-height: 100vh;
+    width: 100vw;
+    height: 100vh;
+    margin: 0;
+    object-fit: contain;
+    clip-path: none;
+    border: none;
+  }
+  
+  #remote:-webkit-full-screen {
+    max-width: 100vw;
+    max-height: 100vh;
+    width: 100vw;
+    height: 100vh;
+    margin: 0;
+    object-fit: contain;
+    clip-path: none;
+    border: none;
+  }
+  
+  #remote:-moz-full-screen {
+    max-width: 100vw;
+    max-height: 100vh;
+    width: 100vw;
+    height: 100vh;
+    margin: 0;
+    object-fit: contain;
+    clip-path: none;
+    border: none;
+  }
+  
+  .video-container {
+    position: relative;
+    display: inline-block;
+    width: 100%;
+    max-width: 900px;
+    margin: 30px auto;
+  }
+  
+  .fullscreen-btn {
+    position: absolute;
+    bottom: 20px;
+    right: 20px;
+    padding: 10px 15px;
+    background: rgba(10, 10, 10, 0.8);
+    border: 2px solid #d4c5aa;
+    color: #d4c5aa;
+    font-family: 'Orbitron', monospace;
+    font-size: 0.8em;
+    cursor: pointer;
+    z-index: 10;
+    clip-path: polygon(5px 0, 100% 0, 100% calc(100% - 5px), calc(100% - 5px) 100%, 0 100%, 0 5px);
+    transition: all 0.3s;
+    opacity: 0;
+    pointer-events: none;
+  }
+  
+  .video-container:hover .fullscreen-btn {
+    opacity: 1;
+    pointer-events: all;
+  }
+  
+  .fullscreen-btn:hover {
+    background: rgba(212, 197, 170, 0.2);
+    box-shadow: 0 0 15px rgba(212, 197, 170, 0.3);
+    transform: translateY(-2px);
+  }
+  
+  .fullscreen-icon {
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    margin-right: 5px;
   }
   
   .controls {
@@ -172,32 +256,6 @@
     background: rgba(10, 10, 10, 0.5);
   }
   
-  #stopBtn {
-    border-color: #ff6b6b;
-    color: #ff6b6b;
-  }
-  
-  #stopBtn:hover:not(:disabled) {
-    background: rgba(255, 107, 107, 0.1);
-    box-shadow: 0 0 20px rgba(255, 107, 107, 0.3);
-  }
-  
-  .info-panel {
-    display: flex;
-    gap: 30px;
-    justify-content: center;
-    margin: 20px 0;
-    flex-wrap: wrap;
-  }
-  
-  .info-item {
-    padding: 10px 20px;
-    border-left: 3px solid #d4c5aa;
-    background: rgba(212, 197, 170, 0.05);
-    font-size: 0.9em;
-    letter-spacing: 1px;
-  }
-  
   .debug-info {
     margin-top: 40px;
     padding: 20px;
@@ -239,20 +297,15 @@
 </head>
 <body>
 <div class="container">
-  <h1>🎥 Broadcaster</h1>
-  <p class="subtitle">OBS Virtual Camera Stream</p>
+  <h1>📱 Viewer</h1>
+  <p class="subtitle">WebRTC Stream Receiver</p>
 
   <div id="status" class="status-disconnected">System Offline</div>
 
-  <video id="local" autoplay playsinline muted></video>
+  <video id="remote" autoplay playsinline></video>
 
   <div class="controls">
-    <button id="startBtn">Start Broadcast</button>
-    <button id="stopBtn" disabled>Stop Broadcast</button>
-  </div>
-
-  <div class="info-panel">
-    <div class="info-item" id="viewerCount">Viewers: 0</div>
+    <button id="connectBtn">Connect & Watch</button>
   </div>
 
   <div class="debug-info">
@@ -281,19 +334,18 @@ const ICE_SERVERS = [
 ];
 
 let ws = null;
-let localStream = null;
+let pc = null;
 let reconnectInterval = null;
-const peerConnections = new Map(); // viewerId -> RTCPeerConnection
-let isStreaming = false; // 配信中かどうか
+let myViewerId = null;
+let connectionTimeout = null;
+let isManualDisconnect = false;
 let reconnectAttempts = 0;
 const MAX_RECONNECT_ATTEMPTS = 10;
 
 const statusDiv = document.getElementById('status');
-const startBtn = document.getElementById('startBtn');
-const stopBtn = document.getElementById('stopBtn');
-const video = document.getElementById('local');
+const connectBtn = document.getElementById('connectBtn');
+const video = document.getElementById('remote');
 const debugLog = document.getElementById('debugLog');
-const viewerCount = document.getElementById('viewerCount');
 
 function log(msg) {
   console.log(msg);
@@ -307,100 +359,185 @@ function log(msg) {
 
 function updateStatus(text, className) {
   const statusMap = {
-    '接続中...': 'Connecting...',
-    '接続済み (配信待機中)': 'Standby Mode',
-    'カメラ起動中...': 'Camera Initializing...',
-    '配信準備完了': 'Ready to Broadcast',
-    '🔴 配信中': '[ LIVE ]',
-    '切断されました': 'Connection Lost',
-    '配信停止': 'Broadcast Ended',
+    'サーバーに接続中...': 'Connecting to Server...',
+    '配信待機中...': 'Waiting for Broadcast...',
+    '配信に接続中...': 'Connecting to Stream...',
+    '✅ 視聴中': '[ STREAMING ]',
+    '配信が終了しました': 'Broadcast Ended',
+    '接続が不安定です': 'Connection Unstable',
+    '接続が切れました': 'Connection Lost',
+    '切断されました': 'Disconnected',
     '接続エラー': 'Connection Error'
   };
   statusDiv.textContent = statusMap[text] || text;
   statusDiv.className = className;
 }
 
-function updateViewerCount() {
-  viewerCount.textContent = `Viewers: ${peerConnections.size}`;
-}
-
 function connectWebSocket() {
   if (ws && ws.readyState === WebSocket.OPEN) return;
   
-  updateStatus('接続中...', 'status-connected');
+  updateStatus('サーバーに接続中...', 'status-connecting');
   log('🔄 WebSocket接続を試行中...');
+  
+  // タイムアウト設定
+  if (connectionTimeout) clearTimeout(connectionTimeout);
+  connectionTimeout = setTimeout(() => {
+    log('⏱️ 接続タイムアウト（30秒）');
+    updateStatus('Connection Timeout', 'status-error');
+    if (ws) {
+      ws.close();
+      ws = null;
+    }
+    reconnectAttempts++;
+    if (reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
+      log(`🔄 再試行 (${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})`);
+      setTimeout(connectWebSocket, 5000);
+    } else {
+      log('❌ 最大再試行回数に達しました');
+      connectBtn.disabled = false;
+      reconnectAttempts = 0;
+    }
+  }, 30000);
+  
   ws = new WebSocket(WS_URL);
   
   ws.onopen = () => {
     log('✅ WebSocket接続成功');
-    updateStatus('接続済み (配信待機中)', 'status-connected');
+    updateStatus('配信待機中...', 'status-waiting');
+    reconnectAttempts = 0;
     
-    // 配信者として登録
-    ws.send(JSON.stringify({ broadcaster: true }));
+    if (connectionTimeout) {
+      clearTimeout(connectionTimeout);
+      connectionTimeout = null;
+    }
     
     if (reconnectInterval) {
       clearInterval(reconnectInterval);
       reconnectInterval = null;
     }
+    
+    // 視聴者として登録
+    log('📤 視聴者として登録');
+    ws.send(JSON.stringify({ 
+      type: 'register',
+      role: 'viewer',
+      viewerId: myViewerId
+    }));
   };
   
   ws.onmessage = async (e) => {
     try {
       const msg = JSON.parse(e.data);
       
-      // 新しい視聴者が接続した
-      if (msg.type === 'newViewer') {
-        log(`👤 新しい視聴者: ${msg.viewerId}`);
-        if (localStream) {
-          await createPeerConnection(msg.viewerId);
-        } else {
-          log('⚠️ ローカルストリームがまだありません。配信開始後に再試行してください。');
-        }
+      // 登録完了
+      if (msg.type === 'registered' && msg.role === 'viewer') {
+        myViewerId = msg.viewerId;
+        log(`✅ 視聴者IDを取得: ${myViewerId}`);
       }
       
-      // 視聴者からのAnswer
-      else if (msg.type === 'answer') {
-        log(`📥 視聴者 ${msg.viewerId} からAnswerを受信`);
-        const pc = peerConnections.get(msg.viewerId);
-        if (pc) {
-          await pc.setRemoteDescription(new RTCSessionDescription(msg.answer));
-          log(`✅ 視聴者 ${msg.viewerId} とのネゴシエーション完了`);
-        }
-      }
-      
-      // 視聴者からのICE候補
-      else if (msg.type === 'candidate') {
-        const pc = peerConnections.get(msg.viewerId);
-        if (pc && msg.candidate) {
-          log(`🧊 視聴者 ${msg.viewerId} からICE候補を受信`);
-          await pc.addIceCandidate(new RTCIceCandidate(msg.candidate));
-        }
-      }
-      
-      // 視聴者が切断
-      else if (msg.type === 'viewerDisconnected') {
-        log(`👋 視聴者 ${msg.viewerId} が切断`);
-        const pc = peerConnections.get(msg.viewerId);
+      // 配信終了
+      else if (msg.type === 'broadcasterDisconnected') {
+        log('🛑 配信が終了しました');
+        updateStatus('配信が終了しました', 'status-error');
         if (pc) {
           pc.close();
-          peerConnections.delete(msg.viewerId);
-          updateViewerCount();
+          pc = null;
         }
+        video.srcObject = null;
+        connectBtn.disabled = false;
       }
       
-      // 登録完了時に既存の視聴者リストを取得
-      else if (msg.type === 'registered' && msg.role === 'broadcaster') {
-        log('✅ 配信者として登録完了');
-        // 既存の視聴者がいるか確認
-        if (msg.existingViewers && msg.existingViewers.length > 0) {
-          log(`📋 既存の視聴者を検出: ${msg.existingViewers.length}人`);
-          // 配信開始後に既存視聴者に接続する
-          window.existingViewers = msg.existingViewers;
+      // 配信者からのOffer
+      else if (msg.type === 'offer') {
+        log('📥 配信者からOfferを受信');
+        updateStatus('配信に接続中...', 'status-connecting');
+        
+        // PeerConnection作成
+        if (pc) pc.close();
+        pc = new RTCPeerConnection({ 
+          iceServers: ICE_SERVERS,
+          iceCandidatePoolSize: 10,
+          bundlePolicy: 'max-bundle',
+          rtcpMuxPolicy: 'require'
+        });
+        log('🔗 PeerConnection作成');
+        
+        // リモートストリーム受信
+        pc.ontrack = (e) => {
+          log('📺 映像トラックを受信');
+          log(`📺 トラック情報: kind=${e.track.kind}, enabled=${e.track.enabled}, readyState=${e.track.readyState}`);
+          
+          if (video.srcObject !== e.streams[0]) {
+            video.srcObject = e.streams[0];
+            log('✅ ビデオソース設定完了');
+          }
+          
+          updateStatus('✅ 視聴中', 'status-connected');
+        };
+        
+        // ICE候補の処理
+        pc.onicecandidate = (e) => {
+          if (e.candidate && ws && ws.readyState === WebSocket.OPEN) {
+            log('🧊 ICE候補を配信者に送信');
+            ws.send(JSON.stringify({ 
+              candidate: e.candidate,
+              viewerId: myViewerId
+            }));
+          } else if (!e.candidate) {
+            log('✅ ICE候補の収集完了');
+          }
+        };
+        
+        pc.oniceconnectionstatechange = () => {
+          const state = pc.iceConnectionState;
+          log(`🔄 ICE接続状態: ${state}`);
+          
+          if (state === 'connected' || state === 'completed') {
+            updateStatus('✅ 視聴中', 'status-connected');
+          } else if (state === 'disconnected') {
+            log('⚠️ 一時的に切断');
+            updateStatus('接続が不安定です', 'status-error');
+          } else if (state === 'failed') {
+            log('❌ ICE接続失敗');
+            updateStatus('接続が切れました', 'status-error');
+            video.srcObject = null;
+          }
+        };
+        
+        pc.onconnectionstatechange = () => {
+          log(`🔄 PeerConnection状態: ${pc.connectionState}`);
+        };
+        
+        // Offer設定とAnswer作成
+        log('📝 RemoteDescriptionを設定');
+        await pc.setRemoteDescription(new RTCSessionDescription(msg.offer));
+        
+        log('📝 Answer作成中...');
+        const answer = await pc.createAnswer();
+        await pc.setLocalDescription(answer);
+        log('✅ LocalDescription設定完了');
+        
+        // Answerを送信
+        if (ws && ws.readyState === WebSocket.OPEN && myViewerId) {
+          log('📤 Answerを配信者に送信');
+          ws.send(JSON.stringify({ 
+            answer,
+            viewerId: myViewerId
+          }));
         }
+        
+        connectBtn.disabled = true;
+      }
+      
+      // 配信者からのICE候補
+      else if (msg.type === 'candidate' && pc) {
+        log('🧊 配信者からICE候補を受信');
+        await pc.addIceCandidate(new RTCIceCandidate(msg.candidate));
       }
       
     } catch (err) {
       log('❌ メッセージ処理エラー: ' + err.message);
+      updateStatus('エラー: ' + err.message, 'status-error');
     }
   };
   
@@ -412,6 +549,7 @@ function connectWebSocket() {
   ws.onclose = () => {
     log('🔌 WebSocket切断');
     updateStatus('切断されました', 'status-disconnected');
+    connectBtn.disabled = false;
     
     if (!reconnectInterval) {
       reconnectInterval = setInterval(() => {
@@ -422,145 +560,46 @@ function connectWebSocket() {
   };
 }
 
-async function createPeerConnection(viewerId) {
-  try {
-    log(`🔗 視聴者 ${viewerId} 用のPeerConnection作成`);
-    
-    const pc = new RTCPeerConnection({ 
-      iceServers: ICE_SERVERS,
-      iceCandidatePoolSize: 10,
-      bundlePolicy: 'max-bundle',
-      rtcpMuxPolicy: 'require'
-    });
-    
-    // トラック追加
-    localStream.getTracks().forEach(track => {
-      pc.addTrack(track, localStream);
-      log(`➕ 視聴者 ${viewerId} にトラック追加: ${track.kind}`);
-    });
-    
-    // ICE候補の処理
-    pc.onicecandidate = (e) => {
-      if (e.candidate && ws && ws.readyState === WebSocket.OPEN) {
-        log(`🧊 視聴者 ${viewerId} 用のICE候補送信`);
-        ws.send(JSON.stringify({ 
-          candidate: e.candidate,
-          targetViewerId: viewerId
-        }));
-      }
-    };
-    
-    pc.oniceconnectionstatechange = () => {
-      log(`🔄 視聴者 ${viewerId} のICE状態: ${pc.iceConnectionState}`);
-      if (pc.iceConnectionState === 'connected') {
-        updateStatus('🔴 配信中', 'status-streaming');
-      } else if (pc.iceConnectionState === 'failed') {
-        log(`❌ 視聴者 ${viewerId} との接続失敗`);
-        pc.close();
-        peerConnections.delete(viewerId);
-        updateViewerCount();
-      }
-    };
-    
-    // Offer作成
-    const offer = await pc.createOffer();
-    await pc.setLocalDescription(offer);
-    log(`✅ 視聴者 ${viewerId} 用のOffer作成完了`);
-    
-    // Offerを送信
-    if (ws && ws.readyState === WebSocket.OPEN) {
-      ws.send(JSON.stringify({ 
-        offer,
-        targetViewerId: viewerId
-      }));
-      log(`📤 視聴者 ${viewerId} にOffer送信`);
+connectBtn.onclick = () => {
+  isManualDisconnect = false;
+  reconnectAttempts = 0;
+  connectWebSocket();
+};
+
+// ページの可視性変更の監視（モバイル対応）
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') {
+    log('📱 ページが前面に復帰');
+    // WebSocketが切れていたら再接続
+    if (ws && ws.readyState !== WebSocket.OPEN && !isManualDisconnect) {
+      log('🔄 バックグラウンド復帰後の再接続');
+      reconnectWebSocket();
     }
-    
-    peerConnections.set(viewerId, pc);
-    updateViewerCount();
-    
-  } catch (err) {
-    log(`❌ 視聴者 ${viewerId} の接続エラー: ${err.message}`);
+  } else {
+    log('📱 ページがバックグラウンドに移行');
   }
-}
+});
 
-async function startBroadcast() {
-  try {
-    log('🎬 配信開始処理を開始');
-    updateStatus('カメラ起動中...', 'status-connected');
-    
-    // カメラ取得
-    localStream = await navigator.mediaDevices.getUserMedia({
-      video: {
-        width: { ideal: 1280 },
-        height: { ideal: 720 },
-        frameRate: { ideal: 30 }
-      },
-      audio: false
-    });
-    
-    log('📹 カメラ取得成功');
-    video.srcObject = localStream;
-    
-    updateStatus('配信準備完了', 'status-streaming');
-    startBtn.disabled = true;
-    stopBtn.disabled = false;
-    
-    // 既存の視聴者がいる場合（再接続時）
-    if (window.existingViewers && window.existingViewers.length > 0) {
-      log(`🔄 既存の視聴者に再接続中: ${window.existingViewers.length}人`);
-      for (const viewerId of window.existingViewers) {
-        await createPeerConnection(viewerId);
-        // 少し間隔をあける
-        await new Promise(resolve => setTimeout(resolve, 100));
-      }
-      window.existingViewers = null;
-    }
-    
-  } catch (err) {
-    log('❌ 配信開始エラー: ' + err.message);
-    updateStatus('エラー: ' + err.message, 'status-error');
-    alert('カメラの起動に失敗しました。\n\nOBSの仮想カメラがONになっているか確認してください。');
+// オンライン/オフライン検知
+window.addEventListener('online', () => {
+  log('🌐 ネットワーク接続が復帰');
+  if (!isManualDisconnect) {
+    reconnectWebSocket();
   }
-}
+});
 
-function stopBroadcast() {
-  log('🛑 配信停止');
-  
-  // 全PeerConnection終了
-  peerConnections.forEach((pc, viewerId) => {
-    pc.close();
-    log(`⏹️ 視聴者 ${viewerId} との接続を終了`);
-  });
-  peerConnections.clear();
-  updateViewerCount();
-  
-  // ストリーム停止
-  if (localStream) {
-    localStream.getTracks().forEach(track => {
-      track.stop();
-      log(`⏹️ トラック停止: ${track.kind}`);
-    });
-    localStream = null;
-  }
-  
-  video.srcObject = null;
-  updateStatus('配信停止', 'status-connected');
-  
-  startBtn.disabled = false;
-  stopBtn.disabled = true;
-}
-
-startBtn.onclick = startBroadcast;
-stopBtn.onclick = stopBroadcast;
+window.addEventListener('offline', () => {
+  log('📵 ネットワーク接続が切断されました');
+  updateStatus('Network Offline', 'status-error');
+});
 
 window.addEventListener('beforeunload', () => {
-  stopBroadcast();
+  isManualDisconnect = true;
+  cleanup();
   if (ws) ws.close();
 });
 
-connectWebSocket();
-log('🚀 配信者ページ読み込み完了');
+log('🚀 視聴者ページ読み込み完了');
 </script>
 </body>
 </html>
