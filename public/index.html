@@ -239,7 +239,7 @@
 </head>
 <body>
 <div class="container">
-  <h1>Broadcaster</h1>
+  <h1>🎥 Broadcaster</h1>
   <p class="subtitle">OBS Virtual Camera Stream</p>
 
   <div id="status" class="status-disconnected">System Offline</div>
@@ -325,7 +325,7 @@ function connectWebSocket() {
   if (ws && ws.readyState === WebSocket.OPEN) return;
   
   updateStatus('接続中...', 'status-connected');
-  log('WebSocket接続を試行中...');
+  log('🔄 WebSocket接続を試行中...');
   ws = new WebSocket(WS_URL);
   
   ws.onopen = () => {
@@ -350,6 +350,8 @@ function connectWebSocket() {
         log(`👤 新しい視聴者: ${msg.viewerId}`);
         if (localStream) {
           await createPeerConnection(msg.viewerId);
+        } else {
+          log('⚠️ ローカルストリームがまだありません。配信開始後に再試行してください。');
         }
       }
       
@@ -374,12 +376,23 @@ function connectWebSocket() {
       
       // 視聴者が切断
       else if (msg.type === 'viewerDisconnected') {
-        log(`視聴者 ${msg.viewerId} が切断`);
+        log(`👋 視聴者 ${msg.viewerId} が切断`);
         const pc = peerConnections.get(msg.viewerId);
         if (pc) {
           pc.close();
           peerConnections.delete(msg.viewerId);
           updateViewerCount();
+        }
+      }
+      
+      // 登録完了時に既存の視聴者リストを取得
+      else if (msg.type === 'registered' && msg.role === 'broadcaster') {
+        log('✅ 配信者として登録完了');
+        // 既存の視聴者がいるか確認
+        if (msg.existingViewers && msg.existingViewers.length > 0) {
+          log(`📋 既存の視聴者を検出: ${msg.existingViewers.length}人`);
+          // 配信開始後に既存視聴者に接続する
+          window.existingViewers = msg.existingViewers;
         }
       }
       
@@ -470,7 +483,7 @@ async function createPeerConnection(viewerId) {
 
 async function startBroadcast() {
   try {
-    log('配信開始処理を開始');
+    log('🎬 配信開始処理を開始');
     updateStatus('カメラ起動中...', 'status-connected');
     
     // カメラ取得
@@ -483,12 +496,23 @@ async function startBroadcast() {
       audio: false
     });
     
-    log('カメラ取得成功');
+    log('📹 カメラ取得成功');
     video.srcObject = localStream;
     
     updateStatus('配信準備完了', 'status-streaming');
     startBtn.disabled = true;
     stopBtn.disabled = false;
+    
+    // 既存の視聴者がいる場合（再接続時）
+    if (window.existingViewers && window.existingViewers.length > 0) {
+      log(`🔄 既存の視聴者に再接続中: ${window.existingViewers.length}人`);
+      for (const viewerId of window.existingViewers) {
+        await createPeerConnection(viewerId);
+        // 少し間隔をあける
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+      window.existingViewers = null;
+    }
     
   } catch (err) {
     log('❌ 配信開始エラー: ' + err.message);
@@ -533,7 +557,7 @@ window.addEventListener('beforeunload', () => {
 });
 
 connectWebSocket();
-log('配信者ページ読み込み完了');
+log('🚀 配信者ページ読み込み完了');
 </script>
 </body>
 </html>
