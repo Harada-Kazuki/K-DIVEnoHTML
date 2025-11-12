@@ -21,6 +21,7 @@ app.get("/", (req, res) => {
 // 配信状態の管理
 let broadcaster = null;
 const viewers = new Map(); // viewerId -> { ws, id, connectedAt }
+let broadcasterDisconnectTimer = null; // 配信者の完全切断判定用
 
 // 定期的なクリーンアップ
 setInterval(() => {
@@ -53,23 +54,50 @@ wss.on("connection", (ws) => {
       if (data.broadcaster) {
         broadcaster = ws;
         isBroadcaster = true;
+        
+        // 再接続の場合、タイマーをクリア
+        if (broadcasterDisconnectTimer) {
+          clearTimeout(broadcasterDisconnectTimer);
+          broadcasterDisconnectTimer = null;
+          console.log("✅ Broadcaster reconnected - timer cleared");
+        }
+        
         console.log("📡 Broadcaster registered");
+        
+        // 既存の視聴者リストを送信
+        const existingViewerIds = Array.from(viewers.keys());
         ws.send(JSON.stringify({ 
           type: 'registered',
-          role: 'broadcaster'
+          role: 'broadcaster',
+          existingViewers: existingViewerIds
         }));
+        
+        if (existingViewerIds.length > 0) {
+          console.log(`📋 Existing viewers sent to broadcaster: ${existingViewerIds.length}`);
+        }
         return;
       }
 
       // 👀 視聴者として登録
-      if (data.viewer) {
-        viewerId = randomUUID();
-        viewers.set(viewerId, {
-          ws,
-          id: viewerId,
-          connectedAt: Date.now()
-        });
-        console.log(`👤 Viewer ${viewerId} registered (total: ${viewers.size})`);
+      if (data.viewer || (data.type === 'register' && data.role === 'viewer')) {
+        const existingViewer = data.viewerId && viewers.has(data.viewerId);
+        
+        if (existingViewer) {
+          // 既存の視聴者が再接続
+          viewerId = data.viewerId;
+          const viewerInfo = viewers.get(viewerId);
+          viewerInfo.ws = ws; // WebSocketを更新
+          console.log(`🔄 Viewer ${viewerId} reconnected (total: ${viewers.size})`);
+        } else {
+          // 新規視聴者
+          viewerId = randomUUID();
+          viewers.set(viewerId, {
+            ws,
+            id: viewerId,
+            connectedAt: Date.now()
+          });
+          console.log(`👤 Viewer ${viewerId} registered (total: ${viewers.size})`);
+        }
         
         // 視聴者にIDを送信
         ws.send(JSON.stringify({ 
@@ -78,13 +106,20 @@ wss.on("connection", (ws) => {
           viewerId
         }));
         
-        // 配信者に新しい視聴者を通知
-        if (broadcaster && broadcaster.readyState === 1) {
+        // 配信者に新しい視聴者を通知（新規の場合のみ）
+        if (!existingViewer && broadcaster && broadcaster.readyState === 1) {
           broadcaster.send(JSON.stringify({
             type: 'newViewer',
             viewerId
           }));
           console.log(`📤 Notified broadcaster about viewer ${viewerId}`);
+        } else if (existingViewer && broadcaster && broadcaster.readyState === 1) {
+          // 再接続の場合も通知（配信者側で再度Offerを送る）
+          broadcaster.send(JSON.stringify({
+            type: 'newViewer',
+            viewerId
+          }));
+          console.log(`📤 Notified broadcaster about reconnected viewer ${viewerId}`);
         }
         return;
       }
@@ -153,15 +188,37 @@ wss.on("connection", (ws) => {
       console.log("🛑 Broadcaster disconnected");
       broadcaster = null;
       
-      // 全視聴者に通知
+      // 10秒待って再接続がなければ完全終了と判断
+      if (broadcasterDisconnectTimer) {
+        clearTimeout(broadcasterDisconnectTimer);
+      }
+      
+      broadcasterDisconnectTimer = setTimeout(() => {
+        console.log("⏰ Broadcaster timeout - treating as permanent disconnect");
+        // 全視聴者に完全終了を通知
+        viewers.forEach((viewer) => {
+          if (viewer.ws.readyState === 1) {
+            viewer.ws.send(JSON.stringify({ 
+              type: 'broadcasterDisconnected',
+              permanent: true
+            }));
+          }
+        });
+        viewers.clear();
+        console.log("🧹 All viewers cleared due to permanent broadcaster disconnect");
+      }, 10000); // 10秒
+      
+      // 一時切断として全視聴者に通知
       viewers.forEach((viewer) => {
         if (viewer.ws.readyState === 1) {
           viewer.ws.send(JSON.stringify({ 
-            type: 'broadcasterDisconnected' 
+            type: 'broadcasterDisconnected',
+            permanent: false
           }));
         }
       });
-      viewers.clear();
+      console.log(`📌 Viewers kept for reconnection: ${viewers.size}`);
+      
     } else if (viewerId) {
       viewers.delete(viewerId);
       console.log(`👋 Viewer ${viewerId} disconnected (remaining: ${viewers.size})`);
