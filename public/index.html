@@ -284,6 +284,9 @@ let ws = null;
 let localStream = null;
 let reconnectInterval = null;
 const peerConnections = new Map(); // viewerId -> RTCPeerConnection
+let isStreaming = false; // 配信中かどうか
+let reconnectAttempts = 0;
+const MAX_RECONNECT_ATTEMPTS = 10;
 
 const statusDiv = document.getElementById('status');
 const startBtn = document.getElementById('startBtn');
