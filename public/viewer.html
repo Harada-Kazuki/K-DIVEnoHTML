@@ -120,8 +120,6 @@
       0 0 30px rgba(212, 197, 170, 0.2),
       inset 0 0 50px rgba(0, 0, 0, 0.5);
     clip-path: polygon(20px 0, 100% 0, 100% calc(100% - 20px), calc(100% - 20px) 100%, 0 100%, 0 20px);
-    position: relative;
-    cursor: pointer;
   }
   
   #remote:fullscreen {
@@ -155,50 +153,6 @@
     object-fit: contain;
     clip-path: none;
     border: none;
-  }
-  
-  .video-container {
-    position: relative;
-    display: inline-block;
-    width: 100%;
-    max-width: 900px;
-    margin: 30px auto;
-  }
-  
-  .fullscreen-btn {
-    position: absolute;
-    bottom: 20px;
-    right: 20px;
-    padding: 10px 15px;
-    background: rgba(10, 10, 10, 0.8);
-    border: 2px solid #d4c5aa;
-    color: #d4c5aa;
-    font-family: 'Orbitron', monospace;
-    font-size: 0.8em;
-    cursor: pointer;
-    z-index: 10;
-    clip-path: polygon(5px 0, 100% 0, 100% calc(100% - 5px), calc(100% - 5px) 100%, 0 100%, 0 5px);
-    transition: all 0.3s;
-    opacity: 0;
-    pointer-events: none;
-  }
-  
-  .video-container:hover .fullscreen-btn {
-    opacity: 1;
-    pointer-events: all;
-  }
-  
-  .fullscreen-btn:hover {
-    background: rgba(212, 197, 170, 0.2);
-    box-shadow: 0 0 15px rgba(212, 197, 170, 0.3);
-    transform: translateY(-2px);
-  }
-  
-  .fullscreen-icon {
-    display: inline-block;
-    width: 16px;
-    height: 16px;
-    margin-right: 5px;
   }
   
   .controls {
@@ -306,6 +260,7 @@
 
   <div class="controls">
     <button id="connectBtn">Connect & Watch</button>
+    <button id="fullscreenBtn" disabled>Fullscreen</button>
   </div>
 
   <div class="debug-info">
@@ -346,6 +301,7 @@ const statusDiv = document.getElementById('status');
 const connectBtn = document.getElementById('connectBtn');
 const video = document.getElementById('remote');
 const debugLog = document.getElementById('debugLog');
+const fullscreenBtn = document.getElementById('fullscreenBtn');
 
 function log(msg) {
   console.log(msg);
@@ -592,6 +548,49 @@ window.addEventListener('offline', () => {
   log('📵 ネットワーク接続が切断されました');
   updateStatus('Network Offline', 'status-error');
 });
+
+// フルスクリーン機能
+fullscreenBtn.onclick = () => {
+  if (!document.fullscreenElement && !document.webkitFullscreenElement && !document.mozFullScreenElement) {
+    // フルスクリーンに入る
+    if (video.requestFullscreen) {
+      video.requestFullscreen();
+    } else if (video.webkitRequestFullscreen) {
+      video.webkitRequestFullscreen();
+    } else if (video.mozRequestFullScreen) {
+      video.mozRequestFullScreen();
+    } else if (video.msRequestFullscreen) {
+      video.msRequestFullscreen();
+    }
+    log('🖥️ フルスクリーンモードに入りました');
+  } else {
+    // フルスクリーンを抜ける
+    if (document.exitFullscreen) {
+      document.exitFullscreen();
+    } else if (document.webkitExitFullscreen) {
+      document.webkitExitFullscreen();
+    } else if (document.mozCancelFullScreen) {
+      document.mozCancelFullScreen();
+    } else if (document.msExitFullscreen) {
+      document.msExitFullscreen();
+    }
+    log('🖥️ フルスクリーンモードを終了しました');
+  }
+};
+
+// フルスクリーン状態の変更を監視
+document.addEventListener('fullscreenchange', updateFullscreenButton);
+document.addEventListener('webkitfullscreenchange', updateFullscreenButton);
+document.addEventListener('mozfullscreenchange', updateFullscreenButton);
+document.addEventListener('MSFullscreenChange', updateFullscreenButton);
+
+function updateFullscreenButton() {
+  if (document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement) {
+    fullscreenBtn.textContent = 'Exit Fullscreen';
+  } else {
+    fullscreenBtn.textContent = 'Fullscreen';
+  }
+}
 
 window.addEventListener('beforeunload', () => {
   isManualDisconnect = true;
