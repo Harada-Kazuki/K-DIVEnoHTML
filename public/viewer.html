@@ -218,7 +218,7 @@
 </head>
 <body>
 <div class="container">
-  <h1>Viewer</h1>
+  <h1>📱 Viewer</h1>
   <p class="subtitle">WebRTC Stream Receiver</p>
 
   <div id="status" class="status-disconnected">System Offline</div>
@@ -227,15 +227,12 @@
 
   <div class="controls">
     <button id="connectBtn">Connect & Watch</button>
-    <button id="fullscreenBtn">Fullscreen</button>
-  </div>
   </div>
 
   <div class="debug-info">
     <strong>// System Log</strong>
     <div id="debugLog"></div>
   </div>
-
 </div>
 
 <script>
@@ -261,6 +258,10 @@ let ws = null;
 let pc = null;
 let reconnectInterval = null;
 let myViewerId = null;
+let connectionTimeout = null;
+let isManualDisconnect = false;
+let reconnectAttempts = 0;
+const MAX_RECONNECT_ATTEMPTS = 10;
 
 const statusDiv = document.getElementById('status');
 const connectBtn = document.getElementById('connectBtn');
@@ -298,11 +299,38 @@ function connectWebSocket() {
   
   updateStatus('サーバーに接続中...', 'status-connecting');
   log('🔄 WebSocket接続を試行中...');
+  
+  // タイムアウト設定
+  if (connectionTimeout) clearTimeout(connectionTimeout);
+  connectionTimeout = setTimeout(() => {
+    log('⏱️ 接続タイムアウト（30秒）');
+    updateStatus('Connection Timeout', 'status-error');
+    if (ws) {
+      ws.close();
+      ws = null;
+    }
+    reconnectAttempts++;
+    if (reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
+      log(`🔄 再試行 (${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})`);
+      setTimeout(connectWebSocket, 5000);
+    } else {
+      log('❌ 最大再試行回数に達しました');
+      connectBtn.disabled = false;
+      reconnectAttempts = 0;
+    }
+  }, 30000);
+  
   ws = new WebSocket(WS_URL);
   
   ws.onopen = () => {
     log('✅ WebSocket接続成功');
     updateStatus('配信待機中...', 'status-waiting');
+    reconnectAttempts = 0;
+    
+    if (connectionTimeout) {
+      clearTimeout(connectionTimeout);
+      connectionTimeout = null;
+    }
     
     if (reconnectInterval) {
       clearInterval(reconnectInterval);
@@ -310,8 +338,12 @@ function connectWebSocket() {
     }
     
     // 視聴者として登録
-    log('視聴者として登録');
-    ws.send(JSON.stringify({ viewer: true }));
+    log('📤 視聴者として登録');
+    ws.send(JSON.stringify({ 
+      type: 'register',
+      role: 'viewer',
+      viewerId: myViewerId
+    }));
   };
   
   ws.onmessage = async (e) => {
@@ -450,40 +482,45 @@ function connectWebSocket() {
 }
 
 connectBtn.onclick = () => {
+  isManualDisconnect = false;
+  reconnectAttempts = 0;
   connectWebSocket();
 };
 
+// ページの可視性変更の監視（モバイル対応）
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') {
+    log('📱 ページが前面に復帰');
+    // WebSocketが切れていたら再接続
+    if (ws && ws.readyState !== WebSocket.OPEN && !isManualDisconnect) {
+      log('🔄 バックグラウンド復帰後の再接続');
+      reconnectWebSocket();
+    }
+  } else {
+    log('📱 ページがバックグラウンドに移行');
+  }
+});
+
+// オンライン/オフライン検知
+window.addEventListener('online', () => {
+  log('🌐 ネットワーク接続が復帰');
+  if (!isManualDisconnect) {
+    reconnectWebSocket();
+  }
+});
+
+window.addEventListener('offline', () => {
+  log('📵 ネットワーク接続が切断されました');
+  updateStatus('Network Offline', 'status-error');
+});
+
 window.addEventListener('beforeunload', () => {
-  if (pc) pc.close();
+  isManualDisconnect = true;
+  cleanup();
   if (ws) ws.close();
 });
 
-// 自動接続はしない
-log('視聴者ページ読み込み完了');
-
-const fullscreenBtn = document.getElementById('fullscreenBtn');
-
-fullscreenBtn.onclick = () => {
-  if (!document.fullscreenElement) {
-    video.requestFullscreen().catch(err => {
-      log('❌ フルスクリーンエラー: ' + err.message);
-    });
-  } else {
-    document.exitFullscreen();
-  }
-};
-
-// フルスクリーン切替時のログ
-document.addEventListener('fullscreenchange', () => {
-  if (document.fullscreenElement) {
-    log('🖥️ フルスクリーンモードに切り替え');
-    fullscreenBtn.textContent = 'Exit Fullscreen';
-  } else {
-    log('↩️ 通常表示に戻りました');
-    fullscreenBtn.textContent = 'Fullscreen';
-  }
-});
-
+log('🚀 視聴者ページ読み込み完了');
 </script>
 </body>
 </html>
