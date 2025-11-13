@@ -260,7 +260,7 @@
 
   <div class="controls">
     <button id="connectBtn">Connect & Watch</button>
-    <button id="fullscreenBtn" disabled>Fullscreen</button>
+    <button id="fullscreenBtn">Fullscreen</button>
   </div>
 
   <div class="debug-info">
@@ -529,7 +529,7 @@ document.addEventListener('visibilitychange', () => {
     // WebSocketが切れていたら再接続
     if (ws && ws.readyState !== WebSocket.OPEN && !isManualDisconnect) {
       log('🔄 バックグラウンド復帰後の再接続');
-      reconnectWebSocket();
+      connectWebSocket();
     }
   } else {
     log('📱 ページがバックグラウンドに移行');
@@ -540,7 +540,7 @@ document.addEventListener('visibilitychange', () => {
 window.addEventListener('online', () => {
   log('🌐 ネットワーク接続が復帰');
   if (!isManualDisconnect) {
-    reconnectWebSocket();
+    connectWebSocket();
   }
 });
 
@@ -594,7 +594,10 @@ function updateFullscreenButton() {
 
 window.addEventListener('beforeunload', () => {
   isManualDisconnect = true;
-  cleanup();
+  if (pc) {
+    pc.close();
+    pc = null;
+  }
   if (ws) ws.close();
 });
 
