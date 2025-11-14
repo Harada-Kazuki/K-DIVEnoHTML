@@ -3,9 +3,9 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>VIEWER | NieR Interface</title>
+<title>視聴者 | WebRTC Viewer</title>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Courier+Prime:wght@400;700&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&display=swap');
   
   * {
     margin: 0;
@@ -14,11 +14,14 @@
   }
   
   body {
-    background: #d6cdb7;
-    color: #4a4035;
-    font-family: 'Courier Prime', monospace;
+    background: #0a0a0a;
+    color: #d4c5aa;
+    font-family: 'Orbitron', monospace;
     min-height: 100vh;
-    padding: 40px 20px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 30px 20px;
     position: relative;
     overflow-x: hidden;
   }
@@ -30,151 +33,93 @@
     left: 0;
     width: 100%;
     height: 100%;
-    background-image: 
-      repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(74, 64, 53, 0.03) 2px, rgba(74, 64, 53, 0.03) 4px);
+    background: 
+      linear-gradient(90deg, transparent 0%, rgba(212, 197, 170, 0.03) 50%, transparent 100%),
+      repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(212, 197, 170, 0.05) 2px, rgba(212, 197, 170, 0.05) 4px);
     pointer-events: none;
     z-index: 0;
   }
   
-  .noise {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    opacity: 0.03;
-    z-index: 1;
-    pointer-events: none;
-    background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200"><filter id="noise"><feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="4" /></filter><rect width="100%" height="100%" filter="url(%23noise)" /></svg>');
-  }
-  
   .container {
     position: relative;
-    z-index: 2;
-    max-width: 1600px;
+    z-index: 1;
+    max-width: 1000px;
     width: 100%;
-    margin: 0 auto;
-    display: grid;
-    grid-template-columns: 1fr 400px;
-    gap: 30px;
-  }
-  
-  .main-panel {
-    display: flex;
-    flex-direction: column;
-  }
-  
-  .side-panel {
-    display: flex;
-    flex-direction: column;
-    gap: 20px;
-  }
-  
-  .glitch-wrapper {
-    position: relative;
-    margin-bottom: 20px;
   }
   
   h1 {
-    font-size: 3em;
-    font-weight: 700;
+    font-size: 2.5em;
+    font-weight: 900;
     text-transform: uppercase;
-    letter-spacing: 3px;
-    margin-bottom: 5px;
-    color: #4a4035;
-    position: relative;
-    display: inline-block;
-  }
-  
-  h1::before {
-    content: '█ VIEWER';
-    position: absolute;
-    left: -2px;
-    text-shadow: -2px 0 #b8a88a;
-    top: 0;
-    color: #4a4035;
-    overflow: hidden;
-    clip: rect(0, 900px, 0, 0);
-    animation: glitch-anim 3s infinite linear alternate-reverse;
-  }
-  
-  @keyframes glitch-anim {
-    0% { clip: rect(42px, 9999px, 44px, 0); }
-    5% { clip: rect(12px, 9999px, 59px, 0); }
-    10% { clip: rect(48px, 9999px, 29px, 0); }
-    15% { clip: rect(42px, 9999px, 73px, 0); }
-    20% { clip: rect(63px, 9999px, 27px, 0); }
-    25% { clip: rect(34px, 9999px, 55px, 0); }
-    30% { clip: rect(86px, 9999px, 73px, 0); }
-    35% { clip: rect(20px, 9999px, 20px, 0); }
-    40% { clip: rect(26px, 9999px, 60px, 0); }
-    45% { clip: rect(25px, 9999px, 66px, 0); }
-    50% { clip: rect(57px, 9999px, 98px, 0); }
-    55% { clip: rect(5px, 9999px, 46px, 0); }
-    60% { clip: rect(82px, 9999px, 31px, 0); }
-    65% { clip: rect(54px, 9999px, 27px, 0); }
-    70% { clip: rect(28px, 9999px, 99px, 0); }
-    75% { clip: rect(45px, 9999px, 43px, 0); }
-    80% { clip: rect(23px, 9999px, 78px, 0); }
-    85% { clip: rect(54px, 9999px, 56px, 0); }
-    90% { clip: rect(29px, 9999px, 28px, 0); }
-    95% { clip: rect(39px, 9999px, 36px, 0); }
-    100% { clip: rect(85px, 9999px, 83px, 0); }
+    letter-spacing: 4px;
+    margin-bottom: 10px;
+    text-shadow: 0 0 20px rgba(212, 197, 170, 0.5);
+    border-left: 4px solid #d4c5aa;
+    padding-left: 20px;
   }
   
   .subtitle {
     font-size: 0.9em;
-    color: #8a7d6a;
+    color: #8a8174;
     margin-bottom: 30px;
+    padding-left: 24px;
     letter-spacing: 2px;
-    text-transform: uppercase;
   }
   
   #status {
     display: inline-block;
-    padding: 10px 25px;
+    padding: 12px 30px;
     margin: 20px 0;
-    border: 2px solid #4a4035;
-    background: #d6cdb7;
-    font-size: 0.85em;
+    border: 2px solid #d4c5aa;
+    background: rgba(10, 10, 10, 0.8);
+    font-size: 0.9em;
     letter-spacing: 2px;
     text-transform: uppercase;
-    font-weight: 700;
+    position: relative;
+    clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px);
   }
   
   .status-disconnected { 
-    border-color: #8a7d6a;
-    color: #8a7d6a;
+    border-color: #555;
+    color: #555;
   }
   .status-connecting { 
-    border-color: #4a4035;
-    color: #4a4035;
-    animation: blink 1s infinite;
+    border-color: #ff9f43;
+    color: #ff9f43;
+    box-shadow: 0 0 20px rgba(255, 159, 67, 0.3);
+    animation: pulse 1.5s infinite;
   }
   .status-connected { 
-    border-color: #4a4035;
-    color: #4a4035;
+    border-color: #d4c5aa;
+    color: #d4c5aa;
+    box-shadow: 0 0 20px rgba(212, 197, 170, 0.4);
   }
   .status-error { 
-    border-color: #7a5647;
-    color: #7a5647;
+    border-color: #ff6b6b;
+    color: #ff6b6b;
+    box-shadow: 0 0 20px rgba(255, 107, 107, 0.3);
   }
   .status-waiting { 
-    border-color: #4a4035;
-    color: #4a4035;
+    border-color: #5ac8fa;
+    color: #5ac8fa;
+    box-shadow: 0 0 20px rgba(90, 200, 250, 0.3);
   }
   
-  @keyframes blink {
-    0%, 49% { opacity: 1; }
-    50%, 100% { opacity: 0.3; }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.6; }
   }
   
   #remote {
     width: 100%;
+    max-width: 900px;
     background: #000;
-    margin: 20px 0;
-    border: 3px solid #4a4035;
-    box-shadow: 8px 8px 0 rgba(74, 64, 53, 0.2);
+    margin: 30px auto;
+    border: 3px solid #d4c5aa;
+    box-shadow: 
+      0 0 30px rgba(212, 197, 170, 0.2),
+      inset 0 0 50px rgba(0, 0, 0, 0.5);
+    clip-path: polygon(20px 0, 100% 0, 100% calc(100% - 20px), calc(100% - 20px) 100%, 0 100%, 0 20px);
   }
   
   #remote:fullscreen {
@@ -184,599 +129,143 @@
     height: 100vh;
     margin: 0;
     object-fit: contain;
+    clip-path: none;
     border: none;
-    box-shadow: none;
+  }
+  
+  #remote:-webkit-full-screen {
+    max-width: 100vw;
+    max-height: 100vh;
+    width: 100vw;
+    height: 100vh;
+    margin: 0;
+    object-fit: contain;
+    clip-path: none;
+    border: none;
+  }
+  
+  #remote:-moz-full-screen {
+    max-width: 100vw;
+    max-height: 100vh;
+    width: 100vw;
+    height: 100vh;
+    margin: 0;
+    object-fit: contain;
+    clip-path: none;
+    border: none;
   }
   
   .controls {
     display: flex;
-    gap: 15px;
-    margin: 20px 0;
+    gap: 20px;
+    justify-content: center;
+    margin: 30px 0;
     flex-wrap: wrap;
   }
   
   button {
-    padding: 12px 30px;
-    font-size: 0.85em;
-    font-family: 'Courier Prime', monospace;
+    padding: 15px 40px;
+    font-size: 0.95em;
+    font-family: 'Orbitron', monospace;
     font-weight: 700;
-    letter-spacing: 1px;
+    letter-spacing: 2px;
     text-transform: uppercase;
-    border: 2px solid #4a4035;
-    background: #d6cdb7;
-    color: #4a4035;
+    border: 2px solid #d4c5aa;
+    background: rgba(10, 10, 10, 0.9);
+    color: #d4c5aa;
     cursor: pointer;
-    transition: all 0.2s;
+    transition: all 0.3s;
+    clip-path: polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px);
     position: relative;
+  }
+  
+  button::before {
+    content: '';
+    position: absolute;
+    top: -2px;
+    left: -2px;
+    right: -2px;
+    bottom: -2px;
+    background: linear-gradient(45deg, transparent, rgba(212, 197, 170, 0.2), transparent);
+    clip-path: polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px);
+    opacity: 0;
+    transition: opacity 0.3s;
+    z-index: -1;
+  }
+  
+  button:hover:not(:disabled)::before {
+    opacity: 1;
   }
   
   button:hover:not(:disabled) {
-    background: #4a4035;
-    color: #d6cdb7;
-    transform: translate(-2px, -2px);
-    box-shadow: 4px 4px 0 rgba(74, 64, 53, 0.3);
-  }
-  
-  button:active:not(:disabled) {
-    transform: translate(0, 0);
-    box-shadow: none;
+    background: rgba(212, 197, 170, 0.1);
+    box-shadow: 0 0 20px rgba(212, 197, 170, 0.3);
+    transform: translateY(-2px);
   }
   
   button:disabled {
-    border-color: #b8a88a;
-    color: #b8a88a;
+    border-color: #333;
+    color: #333;
     cursor: not-allowed;
-    background: #e5ded1;
+    background: rgba(10, 10, 10, 0.5);
   }
   
-  .panel {
-    background: #d6cdb7;
-    border: 3px solid #4a4035;
+  .debug-info {
+    margin-top: 40px;
     padding: 20px;
-    box-shadow: 6px 6px 0 rgba(74, 64, 53, 0.15);
-    position: relative;
-  }
-  
-  .panel::before {
-    content: '';
-    position: absolute;
-    top: -3px;
-    left: 15px;
-    background: #d6cdb7;
-    padding: 0 10px;
-    font-size: 0.75em;
-    letter-spacing: 2px;
-    font-weight: 700;
-    color: #4a4035;
-  }
-  
-  .panel.stats::before { content: '[ STREAM METRICS ]'; }
-  .panel.chat::before { content: '[ COMMUNICATION ]'; }
-  .panel.viewers::before { content: '[ CONNECTED USERS ]'; }
-  
-  .panel h3 {
-    color: #4a4035;
-    font-size: 0.9em;
-    margin-bottom: 15px;
-    letter-spacing: 2px;
-    text-transform: uppercase;
-    font-weight: 700;
-  }
-  
-  .stat-item {
-    display: flex;
-    justify-content: space-between;
-    padding: 10px 0;
-    border-bottom: 1px solid #b8a88a;
-    font-size: 0.85em;
-  }
-  
-  .stat-item:last-child {
-    border-bottom: none;
-  }
-  
-  .stat-label { 
-    color: #8a7d6a;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-  }
-  .stat-value { 
-    color: #4a4035;
-    font-weight: 700;
-  }
-  
-  .chat-panel {
-    display: flex;
-    flex-direction: column;
-    height: 450px;
-  }
-  
-  #chatMessages {
-    flex: 1;
+    background: rgba(0, 0, 0, 0.6);
+    border: 1px solid #333;
+    font-size: 11px;
+    text-align: left;
+    max-width: 900px;
+    margin-left: auto;
+    margin-right: auto;
+    font-family: 'Courier New', monospace;
+    color: #8a8174;
+    clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px);
+    max-height: 300px;
     overflow-y: auto;
-    margin-bottom: 15px;
-    font-size: 0.8em;
-    line-height: 1.8;
-    padding-right: 10px;
   }
   
-  #chatMessages::-webkit-scrollbar {
+  .debug-info::-webkit-scrollbar {
     width: 8px;
   }
   
-  #chatMessages::-webkit-scrollbar-track {
-    background: #e5ded1;
-    border: 1px solid #b8a88a;
+  .debug-info::-webkit-scrollbar-track {
+    background: #0a0a0a;
   }
   
-  #chatMessages::-webkit-scrollbar-thumb {
-    background: #8a7d6a;
-    border: 1px solid #4a4035;
+  .debug-info::-webkit-scrollbar-thumb {
+    background: #333;
+    border-radius: 4px;
   }
   
-  .chat-message {
-    margin-bottom: 12px;
-    padding: 8px 10px;
-    background: #e5ded1;
-    border-left: 3px solid #4a4035;
-  }
-  
-  .chat-sender {
-    color: #4a4035;
-    font-weight: 700;
-    font-size: 0.9em;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-    margin-bottom: 3px;
-  }
-  
-  .chat-text {
-    color: #6a5d4f;
-    line-height: 1.6;
-  }
-  
-  .chat-input-area {
-    display: flex;
-    gap: 10px;
-  }
-  
-  #chatInput {
-    flex: 1;
-    padding: 12px;
-    background: #e5ded1;
-    border: 2px solid #4a4035;
-    color: #4a4035;
-    font-family: 'Courier Prime', monospace;
-    font-size: 0.85em;
-  }
-  
-  #chatInput:focus {
-    outline: none;
-    background: #fff;
-  }
-  
-  #chatInput::placeholder {
-    color: #b8a88a;
-  }
-  
-  .viewer-item {
-    padding: 10px;
-    margin: 8px 0;
-    background: #e5ded1;
-    border-left: 3px solid #4a4035;
-    font-size: 0.85em;
-    color: #4a4035;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-  }
-  
-  .viewer-item::before {
-    content: '> ';
-    color: #8a7d6a;
-  }
-  
-  .reaction-area {
-    margin: 20px 0;
-    padding: 15px;
-    border: 2px dashed #b8a88a;
-    background: rgba(181, 168, 138, 0.1);
-  }
-  
-  .reaction-area label {
+  .debug-info strong {
+    color: #d4c5aa;
+    font-size: 12px;
+    letter-spacing: 2px;
     display: block;
-    font-size: 0.75em;
-    color: #8a7d6a;
-    text-transform: uppercase;
-    letter-spacing: 2px;
     margin-bottom: 10px;
-  }
-  
-  .reaction-buttons {
-    display: flex;
-    gap: 10px;
-    flex-wrap: wrap;
-  }
-  
-  .reaction-btn {
-    padding: 8px 20px;
-    font-size: 0.8em;
-    min-width: auto;
-    letter-spacing: 2px;
-  }
-  
-  .reaction-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    pointer-events: none;
-    z-index: 1000;
-  }
-  
-  .floating-reaction {
-    position: absolute;
-    font-size: 1.5em;
-    font-weight: 700;
-    color: #4a4035;
-    animation: floatUp 3s ease-out forwards;
-    pointer-events: none;
-    text-transform: uppercase;
-    letter-spacing: 2px;
-  }
-  
-  @keyframes floatUp {
-    0% {
-      transform: translateY(0) scale(1);
-      opacity: 1;
-    }
-    100% {
-      transform: translateY(-150px) scale(1.2);
-      opacity: 0;
-    }
-  }
-  
-  .assistant-button {
-    position: fixed;
-    top: 30px;
-    right: 30px;
-    width: 70px;
-    height: 70px;
-    border-radius: 50%;
-    background: #4a4035;
-    border: 3px solid #4a4035;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 1000;
-    transition: all 0.3s;
-    box-shadow: 4px 4px 0 rgba(74, 64, 53, 0.3);
-  }
-  
-  .assistant-button:hover {
-    transform: translate(-2px, -2px) scale(1.05);
-    box-shadow: 6px 6px 0 rgba(74, 64, 53, 0.4);
-  }
-  
-  .assistant-button:active {
-    transform: translate(0, 0) scale(0.95);
-    box-shadow: 2px 2px 0 rgba(74, 64, 53, 0.3);
-  }
-  
-  .assistant-face {
-    font-size: 2.2em;
-    animation: float 3s ease-in-out infinite;
-  }
-  
-  @keyframes float {
-    0%, 100% { transform: translateY(0); }
-    50% { transform: translateY(-5px); }
-  }
-  
-  .help-modal {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: rgba(74, 64, 53, 0.9);
-    display: none;
-    align-items: center;
-    justify-content: center;
-    z-index: 2000;
-    animation: fadeIn 0.3s;
-  }
-  
-  .help-modal.active {
-    display: flex;
-  }
-  
-  @keyframes fadeIn {
-    from { opacity: 0; }
-    to { opacity: 1; }
-  }
-  
-  .help-content {
-    background: #d6cdb7;
-    border: 3px solid #4a4035;
-    padding: 30px;
-    max-width: 700px;
-    max-height: 80vh;
-    overflow-y: auto;
-    box-shadow: 10px 10px 0 rgba(74, 64, 53, 0.3);
-    position: relative;
-    animation: slideIn 0.3s;
-  }
-  
-  @keyframes slideIn {
-    from { transform: translateY(-50px); opacity: 0; }
-    to { transform: translateY(0); opacity: 1; }
-  }
-  
-  .help-content::-webkit-scrollbar {
-    width: 10px;
-  }
-  
-  .help-content::-webkit-scrollbar-track {
-    background: #e5ded1;
-  }
-  
-  .help-content::-webkit-scrollbar-thumb {
-    background: #8a7d6a;
-    border: 1px solid #4a4035;
-  }
-  
-  .help-header {
-    display: flex;
-    align-items: center;
-    gap: 15px;
-    margin-bottom: 25px;
-    padding-bottom: 15px;
-    border-bottom: 2px solid #4a4035;
-  }
-  
-  .help-header .assistant-face {
-    font-size: 2.5em;
-  }
-  
-  .help-header h2 {
-    font-size: 1.5em;
-    color: #4a4035;
-    text-transform: uppercase;
-    letter-spacing: 2px;
-  }
-  
-  .help-close {
-    position: absolute;
-    top: 20px;
-    right: 20px;
-    background: none;
-    border: 2px solid #4a4035;
-    padding: 8px 15px;
-    font-size: 0.9em;
-    cursor: pointer;
-    font-family: 'Courier Prime', monospace;
-    font-weight: 700;
-    color: #4a4035;
-  }
-  
-  .help-close:hover {
-    background: #4a4035;
-    color: #d6cdb7;
-  }
-  
-  .help-section {
-    margin-bottom: 25px;
-  }
-  
-  .help-section h3 {
-    color: #4a4035;
-    font-size: 1.1em;
-    margin-bottom: 12px;
-    text-transform: uppercase;
-    letter-spacing: 2px;
-    border-left: 4px solid #4a4035;
-    padding-left: 12px;
-  }
-  
-  .help-section p {
-    color: #6a5d4f;
-    line-height: 1.8;
-    margin-bottom: 10px;
-  }
-  
-  .help-section ul {
-    list-style: none;
-    padding-left: 0;
-  }
-  
-  .help-section li {
-    color: #6a5d4f;
-    line-height: 1.8;
-    margin-bottom: 8px;
-    padding-left: 20px;
-    position: relative;
-  }
-  
-  .help-section li::before {
-    content: '>';
-    position: absolute;
-    left: 0;
-    color: #8a7d6a;
-    font-weight: 700;
-  }
-  
-  .help-section code {
-    background: #e5ded1;
-    border: 1px solid #b8a88a;
-    padding: 2px 8px;
-    font-family: 'Courier Prime', monospace;
-    color: #4a4035;
-    font-size: 0.9em;
-  }
-  
-  @media (max-width: 1200px) {
-    .container {
-      grid-template-columns: 1fr;
-    }
-    
-    .help-content {
-      margin: 20px;
-      max-width: calc(100% - 40px);
-    }
   }
 </style>
 </head>
 <body>
-<div class="noise"></div>
-<div class="reaction-overlay" id="reactionOverlay"></div>
-
-<div class="assistant-button" id="assistantBtn" title="Click for help">
-  <div class="assistant-face">
-    <img src="robot.png" alt="assistant" class="assistant-icon">
-  </div>
-</div>
-
-<div class="help-modal" id="helpModal">
-  <div class="help-content">
-    <button class="help-close" id="helpClose">[ CLOSE ]</button>
-    
-    <div class="help-header">
-      <div class="assistant-face">
-        <img src="robot.png" alt="assistant" class="assistant-icon">
-      </div>
-      <h2>VIEWER GUIDE</h2>
-    </div>
-  </div>
-</div>
-
-    
-    <div class="help-section">
-      <h3>// OVERVIEW</h3>
-      <p>Welcome to the WebRTC streaming viewer. You can watch live broadcasts, chat with others, and interact with the broadcaster in real-time.</p>
-    </div>
-    
-    <div class="help-section">
-      <h3>// GETTING STARTED</h3>
-      <ul>
-        <li>Click <code>[ CONNECT TO STREAM ]</code> button</li>
-        <li>Enter your preferred username when prompted</li>
-        <li>Wait for the broadcaster to start streaming</li>
-        <li>Enjoy the stream!</li>
-      </ul>
-    </div>
-    
-    <div class="help-section">
-      <h3>// CONTROLS</h3>
-      <ul>
-        <li><code>[ CONNECT TO STREAM ]</code> - Connect to the broadcast</li>
-        <li><code>[ FULLSCREEN ]</code> - Toggle fullscreen mode for the video</li>
-        <li>Press <code>ESC</code> to exit fullscreen</li>
-      </ul>
-    </div>
-    
-    <div class="help-section">
-      <h3>// COMMUNICATION</h3>
-      <ul>
-        <li><strong>Chat:</strong> Send messages visible to everyone</li>
-        <li><strong>Quick Responses:</strong> Send reactions (AGREE, NEGATIVE, NOTED, QUERY)</li>
-        <li><strong>Viewer List:</strong> See who else is watching</li>
-        <li>Press <code>Enter</code> to quickly send chat messages</li>
-      </ul>
-    </div>
-    
-    <div class="help-section">
-      <h3>// STREAM METRICS</h3>
-      <ul>
-        <li><strong>BITRATE:</strong> Current download speed</li>
-        <li><strong>PACKET LOSS:</strong> Network quality indicator (lower is better)</li>
-        <li><strong>LATENCY:</strong> Delay between broadcast and your view</li>
-        <li><strong>CONNECTION STATUS:</strong> Overall stream quality</li>
-      </ul>
-    </div>
-    
-    <div class="help-section">
-      <h3>// TROUBLESHOOTING</h3>
-      <ul>
-        <li>Video won't load? Check your internet connection</li>
-        <li>Choppy playback? High packet loss may indicate network issues</li>
-        <li>Can't see chat? Refresh the page and reconnect</li>
-        <li>Connection lost? The broadcaster may have ended the stream</li>
-      </ul>
-    </div>
-    
-    <div class="help-section">
-      <h3>// TIPS</h3>
-      <ul>
-        <li>Use fullscreen mode for the best viewing experience</li>
-        <li>Stable internet connection recommended for smooth playback</li>
-        <li>Keep the tab active for best performance</li>
-        <li>Interact with chat to engage with the community</li>
-      </ul>
-    </div>
-  </div>
-</div>
-
 <div class="container">
-  <div class="main-panel">
-    <div class="glitch-wrapper">
-      <h1>█ VIEWER</h1>
-      <p class="subtitle">// NEURAL NETWORK RECEIVER PROTOCOL</p>
-    </div>
+  <h1>Viewer</h1>
+  <p class="subtitle">WebRTC Stream Receiver</p>
 
-    <div id="status" class="status-disconnected">SYSTEM OFFLINE</div>
+  <div id="status" class="status-disconnected">System Offline</div>
 
-    <video id="remote" autoplay playsinline></video>
+  <video id="remote" autoplay playsinline></video>
 
-    <div class="controls">
-      <button id="connectBtn">[ CONNECT TO STREAM ]</button>
-      <button id="fullscreenBtn">[ FULLSCREEN ]</button>
-    </div>
-
-    <div class="reaction-area">
-      <label>// Quick Response System</label>
-      <div class="reaction-buttons">
-        <button class="reaction-btn" data-text="AGREE">AGREE</button>
-        <button class="reaction-btn" data-text="NEGATIVE">NEGATIVE</button>
-        <button class="reaction-btn" data-text="NOTED">NOTED</button>
-        <button class="reaction-btn" data-text="QUERY">QUERY</button>
-      </div>
-    </div>
-
-    <div class="panel stats">
-      <div class="stat-item">
-        <span class="stat-label">BITRATE</span>
-        <span class="stat-value" id="bitrate">0 kbps</span>
-      </div>
-      <div class="stat-item">
-        <span class="stat-label">PACKET LOSS</span>
-        <span class="stat-value" id="packetLoss">0%</span>
-      </div>
-      <div class="stat-item">
-        <span class="stat-label">LATENCY</span>
-        <span class="stat-value" id="latency">UNKNOWN</span>
-      </div>
-      <div class="stat-item">
-        <span class="stat-label">CONNECTION STATUS</span>
-        <span class="stat-value" id="connection">DISCONNECTED</span>
-      </div>
-    </div>
+  <div class="controls">
+    <button id="connectBtn">Connect & Watch</button>
+    <button id="fullscreenBtn">Fullscreen</button>
   </div>
 
-  <div class="side-panel">
-    <div class="panel viewers">
-      <h3>ACTIVE CONNECTIONS: <span id="viewerCount">0</span></h3>
-      <div id="viewerList"></div>
-    </div>
-
-    <div class="panel chat chat-panel">
-      <div id="chatMessages"></div>
-      <div class="chat-input-area">
-        <input type="text" id="chatInput" placeholder="Enter message..." maxlength="200">
-        <button id="sendChatBtn">SEND</button>
-      </div>
-    </div>
+  <div class="debug-info">
+    <strong>// System Log</strong>
+    <div id="debugLog"></div>
   </div>
 </div>
 
@@ -786,8 +275,14 @@ const WS_URL = "wss://k-divenohtml.onrender.com";
 const ICE_SERVERS = [
   { urls: 'stun:stun.l.google.com:19302' },
   { urls: 'stun:stun1.l.google.com:19302' },
+  { urls: 'stun:stun2.l.google.com:19302' },
   {
     urls: 'turn:openrelay.metered.ca:80',
+    username: 'openrelayproject',
+    credential: 'openrelayproject'
+  },
+  {
+    urls: 'turn:openrelay.metered.ca:443',
     username: 'openrelayproject',
     credential: 'openrelayproject'
   }
@@ -795,105 +290,94 @@ const ICE_SERVERS = [
 
 let ws = null;
 let pc = null;
+let reconnectInterval = null;
 let myViewerId = null;
-let myName = null;
-let statsInterval = null;
+let connectionTimeout = null;
+let isManualDisconnect = false;
+let reconnectAttempts = 0;
+const MAX_RECONNECT_ATTEMPTS = 10;
 
 const statusDiv = document.getElementById('status');
 const connectBtn = document.getElementById('connectBtn');
-const fullscreenBtn = document.getElementById('fullscreenBtn');
 const video = document.getElementById('remote');
-const chatMessages = document.getElementById('chatMessages');
-const chatInput = document.getElementById('chatInput');
-const sendChatBtn = document.getElementById('sendChatBtn');
-const viewerCount = document.getElementById('viewerCount');
-const viewerList = document.getElementById('viewerList');
-const reactionOverlay = document.getElementById('reactionOverlay');
-const assistantBtn = document.getElementById('assistantBtn');
-const helpModal = document.getElementById('helpModal');
-const helpClose = document.getElementById('helpClose');
+const debugLog = document.getElementById('debugLog');
+const fullscreenBtn = document.getElementById('fullscreenBtn');
 
-// Help modal controls
-assistantBtn.onclick = () => {
-  helpModal.classList.add('active');
-};
-
-helpClose.onclick = () => {
-  helpModal.classList.remove('active');
-};
-
-helpModal.onclick = (e) => {
-  if (e.target === helpModal) {
-    helpModal.classList.remove('active');
+function log(msg) {
+  console.log(msg);
+  const time = new Date().toLocaleTimeString();
+  debugLog.innerHTML = `[${time}] ${msg}<br>` + debugLog.innerHTML;
+  const lines = debugLog.innerHTML.split('<br>');
+  if (lines.length > 30) {
+    debugLog.innerHTML = lines.slice(0, 30).join('<br>');
   }
-};
+}
 
 function updateStatus(text, className) {
-  statusDiv.textContent = text;
+  const statusMap = {
+    'サーバーに接続中...': 'Connecting to Server...',
+    '配信待機中...': 'Waiting for Broadcast...',
+    '配信に接続中...': 'Connecting to Stream...',
+    '✅ 視聴中': '[ STREAMING ]',
+    '配信が終了しました': 'Broadcast Ended',
+    '接続が不安定です': 'Connection Unstable',
+    '接続が切れました': 'Connection Lost',
+    '切断されました': 'Disconnected',
+    '接続エラー': 'Connection Error'
+  };
+  statusDiv.textContent = statusMap[text] || text;
   statusDiv.className = className;
-}
-
-function addChatMessage(sender, message) {
-  const msgDiv = document.createElement('div');
-  msgDiv.className = 'chat-message';
-  msgDiv.innerHTML = `
-    <div class="chat-sender">${sender}</div>
-    <div class="chat-text">${message}</div>
-  `;
-  chatMessages.appendChild(msgDiv);
-  chatMessages.scrollTop = chatMessages.scrollHeight;
-}
-
-function showReaction(text) {
-  const reaction = document.createElement('div');
-  reaction.className = 'floating-reaction';
-  reaction.textContent = text;
-  reaction.style.left = Math.random() * 70 + 15 + '%';
-  reaction.style.top = '70%';
-  reactionOverlay.appendChild(reaction);
-  
-  setTimeout(() => reaction.remove(), 3000);
-}
-
-function updateViewerList(viewers) {
-  viewerCount.textContent = viewers.length;
-  viewerList.innerHTML = '';
-  
-  if (viewers.length === 0) {
-    const emptyDiv = document.createElement('div');
-    emptyDiv.style.cssText = 'color: #8a7d6a; font-size: 0.8em; padding: 10px; text-align: center;';
-    emptyDiv.textContent = '// NO ACTIVE CONNECTIONS';
-    viewerList.appendChild(emptyDiv);
-    return;
-  }
-  
-  viewers.forEach(viewer => {
-    const div = document.createElement('div');
-    div.className = 'viewer-item';
-    div.textContent = viewer.name;
-    viewerList.appendChild(div);
-  });
 }
 
 function connectWebSocket() {
   if (ws && ws.readyState === WebSocket.OPEN) return;
   
-  updateStatus('CONNECTING TO SERVER...', 'status-connecting');
+  updateStatus('サーバーに接続中...', 'status-connecting');
+  log('🔄 WebSocket接続を試行中...');
+  
+  // タイムアウト設定
+  if (connectionTimeout) clearTimeout(connectionTimeout);
+  connectionTimeout = setTimeout(() => {
+    log('⏱️ 接続タイムアウト（30秒）');
+    updateStatus('Connection Timeout', 'status-error');
+    if (ws) {
+      ws.close();
+      ws = null;
+    }
+    reconnectAttempts++;
+    if (reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
+      log(`🔄 再試行 (${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})`);
+      setTimeout(connectWebSocket, 5000);
+    } else {
+      log('❌ 最大再試行回数に達しました');
+      connectBtn.disabled = false;
+      reconnectAttempts = 0;
+    }
+  }, 30000);
+  
   ws = new WebSocket(WS_URL);
   
   ws.onopen = () => {
-    updateStatus('WAITING FOR BROADCAST...', 'status-waiting');
+    log('✅ WebSocket接続成功');
+    updateStatus('配信待機中...', 'status-waiting');
+    reconnectAttempts = 0;
     
-    if (!myName) {
-      myName = prompt('ENTER YOUR DESIGNATION:', `USER_${Math.floor(Math.random() * 1000)}`) || 
-               `USER_${Math.floor(Math.random() * 1000)}`;
+    if (connectionTimeout) {
+      clearTimeout(connectionTimeout);
+      connectionTimeout = null;
     }
     
+    if (reconnectInterval) {
+      clearInterval(reconnectInterval);
+      reconnectInterval = null;
+    }
+    
+    // 視聴者として登録
+    log('📤 視聴者として登録');
     ws.send(JSON.stringify({ 
       type: 'register',
       role: 'viewer',
-      viewerId: myViewerId,
-      name: myName
+      viewerId: myViewerId
     }));
   };
   
@@ -901,69 +385,97 @@ function connectWebSocket() {
     try {
       const msg = JSON.parse(e.data);
       
+      // 登録完了
       if (msg.type === 'registered' && msg.role === 'viewer') {
         myViewerId = msg.viewerId;
+        log(`✅ 視聴者IDを取得: ${myViewerId}`);
       }
+      
+      // 配信終了
       else if (msg.type === 'broadcasterDisconnected') {
-        updateStatus('BROADCAST TERMINATED', 'status-error');
+        log('🛑 配信が終了しました');
+        updateStatus('配信が終了しました', 'status-error');
         if (pc) {
           pc.close();
           pc = null;
         }
         video.srcObject = null;
         connectBtn.disabled = false;
-        
-        if (statsInterval) {
-          clearInterval(statsInterval);
-          statsInterval = null;
-        }
-        
-        document.getElementById('bitrate').textContent = '0 kbps';
-        document.getElementById('packetLoss').textContent = '0%';
-        document.getElementById('latency').textContent = 'UNKNOWN';
-        document.getElementById('connection').textContent = 'DISCONNECTED';
       }
+      
+      // 配信者からのOffer
       else if (msg.type === 'offer') {
-        updateStatus('ESTABLISHING CONNECTION...', 'status-connecting');
+        log('📥 配信者からOfferを受信');
+        updateStatus('配信に接続中...', 'status-connecting');
         
+        // PeerConnection作成
         if (pc) pc.close();
         pc = new RTCPeerConnection({ 
           iceServers: ICE_SERVERS,
-          iceCandidatePoolSize: 10
+          iceCandidatePoolSize: 10,
+          bundlePolicy: 'max-bundle',
+          rtcpMuxPolicy: 'require'
         });
+        log('🔗 PeerConnection作成');
         
+        // リモートストリーム受信
         pc.ontrack = (e) => {
+          log('📺 映像トラックを受信');
+          log(`📺 トラック情報: kind=${e.track.kind}, enabled=${e.track.enabled}, readyState=${e.track.readyState}`);
+          
           if (video.srcObject !== e.streams[0]) {
             video.srcObject = e.streams[0];
+            log('✅ ビデオソース設定完了');
           }
-          updateStatus('[ RECEIVING STREAM ]', 'status-connected');
-          startStatsMonitoring(pc);
+          
+          updateStatus('✅ 視聴中', 'status-connected');
         };
         
+        // ICE候補の処理
         pc.onicecandidate = (e) => {
           if (e.candidate && ws && ws.readyState === WebSocket.OPEN) {
+            log('🧊 ICE候補を配信者に送信');
             ws.send(JSON.stringify({ 
               candidate: e.candidate,
               viewerId: myViewerId
             }));
+          } else if (!e.candidate) {
+            log('✅ ICE候補の収集完了');
           }
         };
         
         pc.oniceconnectionstatechange = () => {
           const state = pc.iceConnectionState;
+          log(`🔄 ICE接続状態: ${state}`);
+          
           if (state === 'connected' || state === 'completed') {
-            updateStatus('[ RECEIVING STREAM ]', 'status-connected');
+            updateStatus('✅ 視聴中', 'status-connected');
+          } else if (state === 'disconnected') {
+            log('⚠️ 一時的に切断');
+            updateStatus('接続が不安定です', 'status-error');
           } else if (state === 'failed') {
-            updateStatus('CONNECTION FAILED', 'status-error');
+            log('❌ ICE接続失敗');
+            updateStatus('接続が切れました', 'status-error');
             video.srcObject = null;
           }
         };
         
+        pc.onconnectionstatechange = () => {
+          log(`🔄 PeerConnection状態: ${pc.connectionState}`);
+        };
+        
+        // Offer設定とAnswer作成
+        log('📝 RemoteDescriptionを設定');
         await pc.setRemoteDescription(new RTCSessionDescription(msg.offer));
+        
+        log('📝 Answer作成中...');
         const answer = await pc.createAnswer();
         await pc.setLocalDescription(answer);
+        log('✅ LocalDescription設定完了');
         
+        // Answerを送信
         if (ws && ws.readyState === WebSocket.OPEN && myViewerId) {
+          log('📤 Answerを配信者に送信');
           ws.send(JSON.stringify({ 
             answer,
             viewerId: myViewerId
@@ -972,121 +484,124 @@ function connectWebSocket() {
         
         connectBtn.disabled = true;
       }
+      
+      // 配信者からのICE候補
       else if (msg.type === 'candidate' && pc) {
+        log('🧊 配信者からICE候補を受信');
         await pc.addIceCandidate(new RTCIceCandidate(msg.candidate));
-      }
-      else if (msg.type === 'chat') {
-        addChatMessage(msg.senderName, msg.message);
-      }
-      else if (msg.type === 'reaction') {
-        showReaction(msg.emoji);
-      }
-      else if (msg.type === 'viewerList') {
-        updateViewerList(msg.viewers);
-      }
-      else if (msg.type === 'chatHistory') {
-        msg.messages.forEach(m => addChatMessage(m.senderName, m.message));
       }
       
     } catch (err) {
-      console.error('Message error:', err);
+      log('❌ メッセージ処理エラー: ' + err.message);
+      updateStatus('エラー: ' + err.message, 'status-error');
     }
   };
   
+  ws.onerror = (err) => {
+    log('❌ WebSocketエラー');
+    updateStatus('接続エラー', 'status-error');
+  };
+  
   ws.onclose = () => {
-    updateStatus('CONNECTION LOST', 'status-disconnected');
+    log('🔌 WebSocket切断');
+    updateStatus('切断されました', 'status-disconnected');
     connectBtn.disabled = false;
-    setTimeout(connectWebSocket, 3000);
+    
+    if (!reconnectInterval) {
+      reconnectInterval = setInterval(() => {
+        log('🔄 自動再接続を試行...');
+        connectWebSocket();
+      }, 3000);
+    }
   };
 }
 
-function startStatsMonitoring(pc) {
-  if (statsInterval) clearInterval(statsInterval);
-  
-  statsInterval = setInterval(async () => {
-    const stats = await pc.getStats();
-    stats.forEach(report => {
-      if (report.type === 'inbound-rtp' && report.mediaType === 'video') {
-        const bitrate = Math.round(report.bytesReceived * 8 / 1000);
-        document.getElementById('bitrate').textContent = `${bitrate} kbps`;
-        
-        const packetLoss = report.packetsLost / (report.packetsReceived + report.packetsLost) * 100;
-        document.getElementById('packetLoss').textContent = `${packetLoss.toFixed(1)}%`;
-        
-        if (report.jitter) {
-          document.getElementById('latency').textContent = `${Math.round(report.jitter * 1000)} ms`;
-        }
-      }
-    });
-    
-    const state = pc.iceConnectionState;
-    const stateMap = {
-      'connected': 'OPTIMAL',
-      'checking': 'NEGOTIATING',
-      'disconnected': 'UNSTABLE',
-      'failed': 'FAILED'
-    };
-    document.getElementById('connection').textContent = stateMap[state] || state.toUpperCase();
-  }, 1000);
-}
-
-function sendChat() {
-  const message = chatInput.value.trim();
-  if (message && ws && ws.readyState === WebSocket.OPEN) {
-    ws.send(JSON.stringify({
-      type: 'chat',
-      message: message
-    }));
-    chatInput.value = '';
-  }
-}
-
 connectBtn.onclick = () => {
+  isManualDisconnect = false;
+  reconnectAttempts = 0;
   connectWebSocket();
 };
 
+// ページの可視性変更の監視（モバイル対応）
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') {
+    log('📱 ページが前面に復帰');
+    // WebSocketが切れていたら再接続
+    if (ws && ws.readyState !== WebSocket.OPEN && !isManualDisconnect) {
+      log('🔄 バックグラウンド復帰後の再接続');
+      connectWebSocket();
+    }
+  } else {
+    log('📱 ページがバックグラウンドに移行');
+  }
+});
+
+// オンライン/オフライン検知
+window.addEventListener('online', () => {
+  log('🌐 ネットワーク接続が復帰');
+  if (!isManualDisconnect) {
+    connectWebSocket();
+  }
+});
+
+window.addEventListener('offline', () => {
+  log('📵 ネットワーク接続が切断されました');
+  updateStatus('Network Offline', 'status-error');
+});
+
+// フルスクリーン機能
 fullscreenBtn.onclick = () => {
-  if (!document.fullscreenElement) {
+  if (!document.fullscreenElement && !document.webkitFullscreenElement && !document.mozFullScreenElement) {
+    // フルスクリーンに入る
     if (video.requestFullscreen) {
       video.requestFullscreen();
     } else if (video.webkitRequestFullscreen) {
       video.webkitRequestFullscreen();
+    } else if (video.mozRequestFullScreen) {
+      video.mozRequestFullScreen();
+    } else if (video.msRequestFullscreen) {
+      video.msRequestFullscreen();
     }
+    log('🖥️ フルスクリーンモードに入りました');
   } else {
+    // フルスクリーンを抜ける
     if (document.exitFullscreen) {
       document.exitFullscreen();
     } else if (document.webkitExitFullscreen) {
       document.webkitExitFullscreen();
+    } else if (document.mozCancelFullScreen) {
+      document.mozCancelFullScreen();
+    } else if (document.msExitFullscreen) {
+      document.msExitFullscreen();
     }
+    log('🖥️ フルスクリーンモードを終了しました');
   }
 };
 
-document.addEventListener('fullscreenchange', () => {
-  fullscreenBtn.textContent = document.fullscreenElement ? '[ EXIT FULLSCREEN ]' : '[ FULLSCREEN ]';
-});
+// フルスクリーン状態の変更を監視
+document.addEventListener('fullscreenchange', updateFullscreenButton);
+document.addEventListener('webkitfullscreenchange', updateFullscreenButton);
+document.addEventListener('mozfullscreenchange', updateFullscreenButton);
+document.addEventListener('MSFullscreenChange', updateFullscreenButton);
 
-sendChatBtn.onclick = sendChat;
-
-chatInput.onkeypress = (e) => {
-  if (e.key === 'Enter') sendChat();
-};
-
-document.querySelectorAll('.reaction-btn').forEach(btn => {
-  btn.onclick = () => {
-    const text = btn.dataset.text;
-    if (ws && ws.readyState === WebSocket.OPEN) {
-      ws.send(JSON.stringify({
-        type: 'reaction',
-        emoji: text
-      }));
-    }
-  };
-});
+function updateFullscreenButton() {
+  if (document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement) {
+    fullscreenBtn.textContent = 'Exit Fullscreen';
+  } else {
+    fullscreenBtn.textContent = 'Fullscreen';
+  }
+}
 
 window.addEventListener('beforeunload', () => {
-  if (pc) pc.close();
+  isManualDisconnect = true;
+  if (pc) {
+    pc.close();
+    pc = null;
+  }
   if (ws) ws.close();
 });
+
+log('🚀 視聴者ページ読み込み完了');
 </script>
 </body>
 </html>
