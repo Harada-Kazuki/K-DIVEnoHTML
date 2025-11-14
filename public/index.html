@@ -3,9 +3,9 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>配信者 | OBS VirtualCam → WebRTC</title>
+<title>BROADCASTER | NieR Interface</title>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=Courier+Prime:wght@400;700&display=swap');
   
   * {
     margin: 0;
@@ -14,14 +14,11 @@
   }
   
   body {
-    background: #0a0a0a;
-    color: #d4c5aa;
-    font-family: 'Orbitron', monospace;
+    background: #d6cdb7;
+    color: #4a4035;
+    font-family: 'Courier Prime', monospace;
     min-height: 100vh;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    padding: 30px 20px;
+    padding: 40px 20px;
     position: relative;
     overflow-x: hidden;
   }
@@ -33,231 +30,753 @@
     left: 0;
     width: 100%;
     height: 100%;
-    background: 
-      linear-gradient(90deg, transparent 0%, rgba(212, 197, 170, 0.03) 50%, transparent 100%),
-      repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(212, 197, 170, 0.05) 2px, rgba(212, 197, 170, 0.05) 4px);
+    background-image: 
+      repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(74, 64, 53, 0.03) 2px, rgba(74, 64, 53, 0.03) 4px);
     pointer-events: none;
     z-index: 0;
   }
   
+  .noise {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    opacity: 0.03;
+    z-index: 1;
+    pointer-events: none;
+    background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200"><filter id="noise"><feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="4" /></filter><rect width="100%" height="100%" filter="url(%23noise)" /></svg>');
+  }
+  
   .container {
     position: relative;
-    z-index: 1;
-    max-width: 1000px;
+    z-index: 2;
+    max-width: 1600px;
     width: 100%;
+    margin: 0 auto;
+    display: grid;
+    grid-template-columns: 1fr 400px;
+    gap: 30px;
+  }
+  
+  .main-panel {
+    display: flex;
+    flex-direction: column;
+  }
+  
+  .side-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+  
+  .glitch-wrapper {
+    position: relative;
+    margin-bottom: 20px;
   }
   
   h1 {
-    font-size: 2.5em;
-    font-weight: 900;
+    font-size: 3em;
+    font-weight: 700;
     text-transform: uppercase;
-    letter-spacing: 4px;
-    margin-bottom: 10px;
-    text-shadow: 0 0 20px rgba(212, 197, 170, 0.5);
-    border-left: 4px solid #d4c5aa;
-    padding-left: 20px;
+    letter-spacing: 3px;
+    margin-bottom: 5px;
+    color: #4a4035;
+    position: relative;
+    display: inline-block;
+  }
+  
+  h1::before {
+    content: '█ BROADCASTER';
+    position: absolute;
+    left: -2px;
+    text-shadow: -2px 0 #b8a88a;
+    top: 0;
+    color: #4a4035;
+    overflow: hidden;
+    clip: rect(0, 900px, 0, 0);
+    animation: glitch-anim 3s infinite linear alternate-reverse;
+  }
+  
+  @keyframes glitch-anim {
+    0% { clip: rect(42px, 9999px, 44px, 0); }
+    5% { clip: rect(12px, 9999px, 59px, 0); }
+    10% { clip: rect(48px, 9999px, 29px, 0); }
+    15% { clip: rect(42px, 9999px, 73px, 0); }
+    20% { clip: rect(63px, 9999px, 27px, 0); }
+    25% { clip: rect(34px, 9999px, 55px, 0); }
+    30% { clip: rect(86px, 9999px, 73px, 0); }
+    35% { clip: rect(20px, 9999px, 20px, 0); }
+    40% { clip: rect(26px, 9999px, 60px, 0); }
+    45% { clip: rect(25px, 9999px, 66px, 0); }
+    50% { clip: rect(57px, 9999px, 98px, 0); }
+    55% { clip: rect(5px, 9999px, 46px, 0); }
+    60% { clip: rect(82px, 9999px, 31px, 0); }
+    65% { clip: rect(54px, 9999px, 27px, 0); }
+    70% { clip: rect(28px, 9999px, 99px, 0); }
+    75% { clip: rect(45px, 9999px, 43px, 0); }
+    80% { clip: rect(23px, 9999px, 78px, 0); }
+    85% { clip: rect(54px, 9999px, 56px, 0); }
+    90% { clip: rect(29px, 9999px, 28px, 0); }
+    95% { clip: rect(39px, 9999px, 36px, 0); }
+    100% { clip: rect(85px, 9999px, 83px, 0); }
   }
   
   .subtitle {
     font-size: 0.9em;
-    color: #8a8174;
+    color: #8a7d6a;
     margin-bottom: 30px;
-    padding-left: 24px;
     letter-spacing: 2px;
+    text-transform: uppercase;
   }
   
   #status {
     display: inline-block;
-    padding: 12px 30px;
+    padding: 10px 25px;
     margin: 20px 0;
-    border: 2px solid #d4c5aa;
-    background: rgba(10, 10, 10, 0.8);
-    font-size: 0.9em;
+    border: 2px solid #4a4035;
+    background: #d6cdb7;
+    font-size: 0.85em;
     letter-spacing: 2px;
     text-transform: uppercase;
-    position: relative;
-    clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px);
+    font-weight: 700;
   }
   
   .status-disconnected { 
-    border-color: #555;
-    color: #555;
+    border-color: #8a7d6a;
+    color: #8a7d6a;
   }
   .status-connected { 
-    border-color: #5ac8fa;
-    color: #5ac8fa;
-    box-shadow: 0 0 20px rgba(90, 200, 250, 0.3);
+    border-color: #4a4035;
+    color: #4a4035;
   }
   .status-streaming { 
-    border-color: #d4c5aa;
-    color: #d4c5aa;
-    box-shadow: 0 0 20px rgba(212, 197, 170, 0.4);
-    animation: pulse 2s infinite;
+    border-color: #4a4035;
+    color: #4a4035;
+    animation: blink 1.5s infinite;
   }
   .status-error { 
-    border-color: #ff6b6b;
-    color: #ff6b6b;
-    box-shadow: 0 0 20px rgba(255, 107, 107, 0.3);
+    border-color: #7a5647;
+    color: #7a5647;
   }
   
-  @keyframes pulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.7; }
+  @keyframes blink {
+    0%, 49% { opacity: 1; }
+    50%, 100% { opacity: 0.3; }
   }
   
   #local {
     width: 100%;
-    max-width: 900px;
     background: #000;
-    margin: 30px auto;
-    border: 3px solid #d4c5aa;
-    box-shadow: 
-      0 0 30px rgba(212, 197, 170, 0.2),
-      inset 0 0 50px rgba(0, 0, 0, 0.5);
-    clip-path: polygon(20px 0, 100% 0, 100% calc(100% - 20px), calc(100% - 20px) 100%, 0 100%, 0 20px);
+    margin: 20px 0;
+    border: 3px solid #4a4035;
+    box-shadow: 8px 8px 0 rgba(74, 64, 53, 0.2);
   }
   
   .controls {
     display: flex;
-    gap: 20px;
-    justify-content: center;
-    margin: 30px 0;
-    flex-wrap: wrap;
-  }
-  
-  button {
-    padding: 15px 40px;
-    font-size: 0.95em;
-    font-family: 'Orbitron', monospace;
-    font-weight: 700;
-    letter-spacing: 2px;
-    text-transform: uppercase;
-    border: 2px solid #d4c5aa;
-    background: rgba(10, 10, 10, 0.9);
-    color: #d4c5aa;
-    cursor: pointer;
-    transition: all 0.3s;
-    clip-path: polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px);
-    position: relative;
-  }
-  
-  button::before {
-    content: '';
-    position: absolute;
-    top: -2px;
-    left: -2px;
-    right: -2px;
-    bottom: -2px;
-    background: linear-gradient(45deg, transparent, rgba(212, 197, 170, 0.2), transparent);
-    clip-path: polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px);
-    opacity: 0;
-    transition: opacity 0.3s;
-    z-index: -1;
-  }
-  
-  button:hover:not(:disabled)::before {
-    opacity: 1;
-  }
-  
-  button:hover:not(:disabled) {
-    background: rgba(212, 197, 170, 0.1);
-    box-shadow: 0 0 20px rgba(212, 197, 170, 0.3);
-    transform: translateY(-2px);
-  }
-  
-  button:disabled {
-    border-color: #333;
-    color: #333;
-    cursor: not-allowed;
-    background: rgba(10, 10, 10, 0.5);
-  }
-  
-  #stopBtn {
-    border-color: #ff6b6b;
-    color: #ff6b6b;
-  }
-  
-  #stopBtn:hover:not(:disabled) {
-    background: rgba(255, 107, 107, 0.1);
-    box-shadow: 0 0 20px rgba(255, 107, 107, 0.3);
-  }
-  
-  .info-panel {
-    display: flex;
-    gap: 30px;
-    justify-content: center;
+    gap: 15px;
     margin: 20px 0;
     flex-wrap: wrap;
   }
   
-  .info-item {
-    padding: 10px 20px;
-    border-left: 3px solid #d4c5aa;
-    background: rgba(212, 197, 170, 0.05);
+  button {
+    padding: 12px 30px;
+    font-size: 0.85em;
+    font-family: 'Courier Prime', monospace;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    border: 2px solid #4a4035;
+    background: #d6cdb7;
+    color: #4a4035;
+    cursor: pointer;
+    transition: all 0.2s;
+    position: relative;
+  }
+  
+  button:hover:not(:disabled) {
+    background: #4a4035;
+    color: #d6cdb7;
+    transform: translate(-2px, -2px);
+    box-shadow: 4px 4px 0 rgba(74, 64, 53, 0.3);
+  }
+  
+  button:active:not(:disabled) {
+    transform: translate(0, 0);
+    box-shadow: none;
+  }
+  
+  button:disabled {
+    border-color: #b8a88a;
+    color: #b8a88a;
+    cursor: not-allowed;
+    background: #e5ded1;
+  }
+  
+  button.danger {
+    border-color: #7a5647;
+    color: #7a5647;
+  }
+  
+  button.danger:hover:not(:disabled) {
+    background: #7a5647;
+    color: #d6cdb7;
+  }
+  
+  button.recording {
+    animation: blink 1s infinite;
+  }
+  
+  .panel {
+    background: #d6cdb7;
+    border: 3px solid #4a4035;
+    padding: 20px;
+    box-shadow: 6px 6px 0 rgba(74, 64, 53, 0.15);
+    position: relative;
+  }
+  
+  .panel::before {
+    content: '';
+    position: absolute;
+    top: -3px;
+    left: 15px;
+    background: #d6cdb7;
+    padding: 0 10px;
+    font-size: 0.75em;
+    letter-spacing: 2px;
+    font-weight: 700;
+    color: #4a4035;
+  }
+  
+  .panel.stats::before { content: '[ STATISTICS ]'; }
+  .panel.chat::before { content: '[ COMMUNICATION ]'; }
+  .panel.viewers::before { content: '[ CONNECTED USERS ]'; }
+  
+  .panel h3 {
+    color: #4a4035;
     font-size: 0.9em;
+    margin-bottom: 15px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    font-weight: 700;
+  }
+  
+  .stat-item {
+    display: flex;
+    justify-content: space-between;
+    padding: 10px 0;
+    border-bottom: 1px solid #b8a88a;
+    font-size: 0.85em;
+  }
+  
+  .stat-item:last-child {
+    border-bottom: none;
+  }
+  
+  .stat-label { 
+    color: #8a7d6a;
+    text-transform: uppercase;
     letter-spacing: 1px;
   }
-  
-  .debug-info {
-    margin-top: 40px;
-    padding: 20px;
-    background: rgba(0, 0, 0, 0.6);
-    border: 1px solid #333;
-    font-size: 11px;
-    text-align: left;
-    max-width: 900px;
-    margin-left: auto;
-    margin-right: auto;
-    font-family: 'Courier New', monospace;
-    color: #8a8174;
-    clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px);
-    max-height: 300px;
-    overflow-y: auto;
+  .stat-value { 
+    color: #4a4035;
+    font-weight: 700;
   }
   
-  .debug-info::-webkit-scrollbar {
+  .chat-panel {
+    display: flex;
+    flex-direction: column;
+    height: 450px;
+  }
+  
+  #chatMessages {
+    flex: 1;
+    overflow-y: auto;
+    margin-bottom: 15px;
+    font-size: 0.8em;
+    line-height: 1.8;
+    padding-right: 10px;
+  }
+  
+  #chatMessages::-webkit-scrollbar {
     width: 8px;
   }
   
-  .debug-info::-webkit-scrollbar-track {
-    background: #0a0a0a;
+  #chatMessages::-webkit-scrollbar-track {
+    background: #e5ded1;
+    border: 1px solid #b8a88a;
   }
   
-  .debug-info::-webkit-scrollbar-thumb {
-    background: #333;
-    border-radius: 4px;
+  #chatMessages::-webkit-scrollbar-thumb {
+    background: #8a7d6a;
+    border: 1px solid #4a4035;
   }
   
-  .debug-info strong {
-    color: #d4c5aa;
-    font-size: 12px;
-    letter-spacing: 2px;
+  .chat-message {
+    margin-bottom: 12px;
+    padding: 8px 10px;
+    background: #e5ded1;
+    border-left: 3px solid #4a4035;
+  }
+  
+  .chat-sender {
+    color: #4a4035;
+    font-weight: 700;
+    font-size: 0.9em;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 3px;
+  }
+  
+  .chat-text {
+    color: #6a5d4f;
+    line-height: 1.6;
+  }
+  
+  .chat-input-area {
+    display: flex;
+    gap: 10px;
+  }
+  
+  #chatInput {
+    flex: 1;
+    padding: 12px;
+    background: #e5ded1;
+    border: 2px solid #4a4035;
+    color: #4a4035;
+    font-family: 'Courier Prime', monospace;
+    font-size: 0.85em;
+  }
+  
+  #chatInput:focus {
+    outline: none;
+    background: #fff;
+  }
+  
+  #chatInput::placeholder {
+    color: #b8a88a;
+  }
+  
+  .viewer-item {
+    padding: 10px;
+    margin: 8px 0;
+    background: #e5ded1;
+    border-left: 3px solid #4a4035;
+    font-size: 0.85em;
+    color: #4a4035;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+  
+  .viewer-item::before {
+    content: '> ';
+    color: #8a7d6a;
+  }
+  
+  .reaction-area {
+    margin: 20px 0;
+    padding: 15px;
+    border: 2px dashed #b8a88a;
+    background: rgba(181, 168, 138, 0.1);
+  }
+  
+  .reaction-area label {
     display: block;
+    font-size: 0.75em;
+    color: #8a7d6a;
+    text-transform: uppercase;
+    letter-spacing: 2px;
     margin-bottom: 10px;
+  }
+  
+  .reaction-buttons {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  
+  .reaction-btn {
+    padding: 8px 20px;
+    font-size: 0.8em;
+    min-width: auto;
+    letter-spacing: 2px;
+  }
+  
+  .reaction-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 1000;
+  }
+  
+  .floating-reaction {
+    position: absolute;
+    font-size: 1.5em;
+    font-weight: 700;
+    color: #4a4035;
+    animation: floatUp 3s ease-out forwards;
+    pointer-events: none;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+  }
+  
+  @keyframes floatUp {
+    0% {
+      transform: translateY(0) scale(1);
+      opacity: 1;
+    }
+    100% {
+      transform: translateY(-150px) scale(1.2);
+      opacity: 0;
+    }
+  }
+  
+  .assistant-button {
+    position: fixed;
+    top: 30px;
+    right: 30px;
+    width: 70px;
+    height: 70px;
+    border-radius: 50%;
+    background: #4a4035;
+    border: 3px solid #4a4035;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    transition: all 0.3s;
+    box-shadow: 4px 4px 0 rgba(74, 64, 53, 0.3);
+  }
+  
+  .assistant-button:hover {
+    transform: translate(-2px, -2px) scale(1.05);
+    box-shadow: 6px 6px 0 rgba(74, 64, 53, 0.4);
+  }
+  
+  .assistant-button:active {
+    transform: translate(0, 0) scale(0.95);
+    box-shadow: 2px 2px 0 rgba(74, 64, 53, 0.3);
+  }
+  
+  .assistant-face {
+    font-size: 2.2em;
+    animation: float 3s ease-in-out infinite;
+  }
+  
+  @keyframes float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-5px); }
+  }
+  
+  .help-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(74, 64, 53, 0.9);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 2000;
+    animation: fadeIn 0.3s;
+  }
+  
+  .help-modal.active {
+    display: flex;
+  }
+  
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+  
+  .help-content {
+    background: #d6cdb7;
+    border: 3px solid #4a4035;
+    padding: 30px;
+    max-width: 700px;
+    max-height: 80vh;
+    overflow-y: auto;
+    box-shadow: 10px 10px 0 rgba(74, 64, 53, 0.3);
+    position: relative;
+    animation: slideIn 0.3s;
+  }
+  
+  @keyframes slideIn {
+    from { transform: translateY(-50px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+  }
+  
+  .help-content::-webkit-scrollbar {
+    width: 10px;
+  }
+  
+  .help-content::-webkit-scrollbar-track {
+    background: #e5ded1;
+  }
+  
+  .help-content::-webkit-scrollbar-thumb {
+    background: #8a7d6a;
+    border: 1px solid #4a4035;
+  }
+  
+  .help-header {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    margin-bottom: 25px;
+    padding-bottom: 15px;
+    border-bottom: 2px solid #4a4035;
+  }
+  
+  .help-header .assistant-face {
+    font-size: 2.5em;
+  }
+  
+  .help-header h2 {
+    font-size: 1.5em;
+    color: #4a4035;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+  }
+  
+  .help-close {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    background: none;
+    border: 2px solid #4a4035;
+    padding: 8px 15px;
+    font-size: 0.9em;
+    cursor: pointer;
+    font-family: 'Courier Prime', monospace;
+    font-weight: 700;
+    color: #4a4035;
+  }
+  
+  .help-close:hover {
+    background: #4a4035;
+    color: #d6cdb7;
+  }
+  
+  .help-section {
+    margin-bottom: 25px;
+  }
+  
+  .help-section h3 {
+    color: #4a4035;
+    font-size: 1.1em;
+    margin-bottom: 12px;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    border-left: 4px solid #4a4035;
+    padding-left: 12px;
+  }
+  
+  .help-section p {
+    color: #6a5d4f;
+    line-height: 1.8;
+    margin-bottom: 10px;
+  }
+  
+  .help-section ul {
+    list-style: none;
+    padding-left: 0;
+  }
+  
+  .help-section li {
+    color: #6a5d4f;
+    line-height: 1.8;
+    margin-bottom: 8px;
+    padding-left: 20px;
+    position: relative;
+  }
+  
+  .help-section li::before {
+    content: '>';
+    position: absolute;
+    left: 0;
+    color: #8a7d6a;
+    font-weight: 700;
+  }
+  
+  .help-section code {
+    background: #e5ded1;
+    border: 1px solid #b8a88a;
+    padding: 2px 8px;
+    font-family: 'Courier Prime', monospace;
+    color: #4a4035;
+    font-size: 0.9em;
+  }
+  
+  @media (max-width: 1200px) {
+    .container {
+      grid-template-columns: 1fr;
+    }
+    
+    .help-content {
+      margin: 20px;
+      max-width: calc(100% - 40px);
+    }
   }
 </style>
 </head>
 <body>
+<div class="noise"></div>
+<div class="reaction-overlay" id="reactionOverlay"></div>
+
+<div class="assistant-button" id="assistantBtn" title="Click for help">
+  <div class="assistant-face">
+    <img src="robot.png" alt="assistant" class="assistant-icon">
+  </div>
+</div>
+
+<div class="help-modal" id="helpModal">
+  <div class="help-content">
+    <button class="help-close" id="helpClose">[ CLOSE ]</button>
+    
+    <div class="help-header">
+      <div class="assistant-face">
+        <img src="robot.png" alt="assistant" class="assistant-icon">
+      </div>
+      <h2>SYSTEM GUIDE</h2>
+    </div>
+  </div>
+</div>
+    
+    <div class="help-section">
+      <h3>// OVERVIEW</h3>
+      <p>This is a WebRTC-based broadcasting system. You can stream your OBS Virtual Camera to multiple viewers in real-time.</p>
+    </div>
+    
+    <div class="help-section">
+      <h3>// GETTING STARTED</h3>
+      <ul>
+        <li>Open <code>OBS Studio</code> and start your Virtual Camera</li>
+        <li>Click <code>[ INITIATE BROADCAST ]</code> button</li>
+        <li>Grant camera permissions when prompted</li>
+        <li>Share the viewer URL with your audience</li>
+      </ul>
+    </div>
+    
+    <div class="help-section">
+      <h3>// CONTROLS</h3>
+      <ul>
+        <li><code>[ INITIATE BROADCAST ]</code> - Start streaming your camera</li>
+        <li><code>[ TERMINATE ]</code> - Stop the broadcast</li>
+        <li><code>[ RECORD ]</code> - Record the stream locally (downloads as WebM file)</li>
+        <li><code>[ AUDIO ]</code> - Toggle microphone audio on/off</li>
+      </ul>
+    </div>
+    
+    <div class="help-section">
+      <h3>// COMMUNICATION</h3>
+      <ul>
+        <li><strong>Chat:</strong> Send messages to all connected viewers</li>
+        <li><strong>Quick Responses:</strong> Send preset reactions (AGREE, NEGATIVE, NOTED, QUERY)</li>
+        <li><strong>Viewer List:</strong> See who's currently watching</li>
+      </ul>
+    </div>
+    
+    <div class="help-section">
+      <h3>// STATISTICS</h3>
+      <ul>
+        <li><strong>BITRATE:</strong> Current streaming bandwidth</li>
+        <li><strong>FRAME RATE:</strong> Frames per second being sent</li>
+        <li><strong>RESOLUTION:</strong> Video dimensions</li>
+        <li><strong>CONNECTION STATUS:</strong> Stream quality indicator</li>
+      </ul>
+    </div>
+    
+    <div class="help-section">
+      <h3>// TROUBLESHOOTING</h3>
+      <ul>
+        <li>If camera fails to start, ensure OBS Virtual Camera is enabled</li>
+        <li>For audio issues, check browser microphone permissions</li>
+        <li>Poor connection? Check your network bandwidth</li>
+        <li>Viewers can't connect? Verify server status</li>
+      </ul>
+    </div>
+    
+    <div class="help-section">
+      <h3>// TIPS</h3>
+      <ul>
+        <li>Test your setup before going live</li>
+        <li>Use wired internet for best quality</li>
+        <li>Monitor connection status regularly</li>
+        <li>Keep chat active to engage with viewers</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
 <div class="container">
-  <h1>🎥 Broadcaster</h1>
-  <p class="subtitle">OBS Virtual Camera Stream</p>
+  <div class="main-panel">
+    <div class="glitch-wrapper">
+      <h1>█ BROADCASTER</h1>
+      <p class="subtitle">// NEURAL NETWORK STREAMING PROTOCOL</p>
+    </div>
 
-  <div id="status" class="status-disconnected">System Offline</div>
+    <div id="status" class="status-disconnected">SYSTEM OFFLINE</div>
 
-  <video id="local" autoplay playsinline muted></video>
+    <video id="local" autoplay playsinline muted></video>
 
-  <div class="controls">
-    <button id="startBtn">Start Broadcast</button>
-    <button id="stopBtn" disabled>Stop Broadcast</button>
+    <div class="controls">
+      <button id="startBtn">[ INITIATE BROADCAST ]</button>
+      <button id="stopBtn" disabled class="danger">[ TERMINATE ]</button>
+      <button id="recordBtn" disabled>[ RECORD ]</button>
+      <button id="audioToggle" disabled>[ AUDIO: OFF ]</button>
+    </div>
+
+    <div class="reaction-area">
+      <label>// Quick Response System</label>
+      <div class="reaction-buttons">
+        <button class="reaction-btn" data-text="AGREE">AGREE</button>
+        <button class="reaction-btn" data-text="NEGATIVE">NEGATIVE</button>
+        <button class="reaction-btn" data-text="NOTED">NOTED</button>
+        <button class="reaction-btn" data-text="QUERY">QUERY</button>
+      </div>
+    </div>
+
+    <div class="panel stats">
+      <div class="stat-item">
+        <span class="stat-label">BITRATE</span>
+        <span class="stat-value" id="bitrate">0 kbps</span>
+      </div>
+      <div class="stat-item">
+        <span class="stat-label">FRAME RATE</span>
+        <span class="stat-value" id="fps">0 fps</span>
+      </div>
+      <div class="stat-item">
+        <span class="stat-label">RESOLUTION</span>
+        <span class="stat-value" id="resolution">UNKNOWN</span>
+      </div>
+      <div class="stat-item">
+        <span class="stat-label">CONNECTION STATUS</span>
+        <span class="stat-value" id="connection">DISCONNECTED</span>
+      </div>
+    </div>
   </div>
 
-  <div class="info-panel">
-    <div class="info-item" id="viewerCount">Viewers: 0</div>
-  </div>
+  <div class="side-panel">
+    <div class="panel viewers">
+      <h3>ACTIVE CONNECTIONS: <span id="viewerCount">0</span></h3>
+      <div id="viewerList"></div>
+    </div>
 
-  <div class="debug-info">
-    <strong>// System Log</strong>
-    <div id="debugLog"></div>
+    <div class="panel chat chat-panel">
+      <div id="chatMessages"></div>
+      <div class="chat-input-area">
+        <input type="text" id="chatInput" placeholder="Enter message..." maxlength="200">
+        <button id="sendChatBtn">SEND</button>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -267,14 +786,8 @@ const WS_URL = "wss://k-divenohtml.onrender.com";
 const ICE_SERVERS = [
   { urls: 'stun:stun.l.google.com:19302' },
   { urls: 'stun:stun1.l.google.com:19302' },
-  { urls: 'stun:stun2.l.google.com:19302' },
   {
     urls: 'turn:openrelay.metered.ca:80',
-    username: 'openrelayproject',
-    credential: 'openrelayproject'
-  },
-  {
-    urls: 'turn:openrelay.metered.ca:443',
     username: 'openrelayproject',
     credential: 'openrelayproject'
   }
@@ -282,167 +795,166 @@ const ICE_SERVERS = [
 
 let ws = null;
 let localStream = null;
-let reconnectInterval = null;
-const peerConnections = new Map(); // viewerId -> RTCPeerConnection
-let isStreaming = false; // 配信中かどうか
-let reconnectAttempts = 0;
-const MAX_RECONNECT_ATTEMPTS = 10;
+const peerConnections = new Map();
+let mediaRecorder = null;
+let recordedChunks = [];
+let statsInterval = null;
+let hasAudio = false;
 
 const statusDiv = document.getElementById('status');
 const startBtn = document.getElementById('startBtn');
 const stopBtn = document.getElementById('stopBtn');
+const recordBtn = document.getElementById('recordBtn');
+const audioToggle = document.getElementById('audioToggle');
 const video = document.getElementById('local');
-const debugLog = document.getElementById('debugLog');
+const chatMessages = document.getElementById('chatMessages');
+const chatInput = document.getElementById('chatInput');
+const sendChatBtn = document.getElementById('sendChatBtn');
 const viewerCount = document.getElementById('viewerCount');
+const viewerList = document.getElementById('viewerList');
+const reactionOverlay = document.getElementById('reactionOverlay');
+const assistantBtn = document.getElementById('assistantBtn');
+const helpModal = document.getElementById('helpModal');
+const helpClose = document.getElementById('helpClose');
 
-function log(msg) {
-  console.log(msg);
-  const time = new Date().toLocaleTimeString();
-  debugLog.innerHTML = `[${time}] ${msg}<br>` + debugLog.innerHTML;
-  const lines = debugLog.innerHTML.split('<br>');
-  if (lines.length > 30) {
-    debugLog.innerHTML = lines.slice(0, 30).join('<br>');
+// Help modal controls
+assistantBtn.onclick = () => {
+  helpModal.classList.add('active');
+};
+
+helpClose.onclick = () => {
+  helpModal.classList.remove('active');
+};
+
+helpModal.onclick = (e) => {
+  if (e.target === helpModal) {
+    helpModal.classList.remove('active');
   }
-}
+};
 
 function updateStatus(text, className) {
-  const statusMap = {
-    '接続中...': 'Connecting...',
-    '接続済み (配信待機中)': 'Standby Mode',
-    'カメラ起動中...': 'Camera Initializing...',
-    '配信準備完了': 'Ready to Broadcast',
-    '🔴 配信中': '[ LIVE ]',
-    '切断されました': 'Connection Lost',
-    '配信停止': 'Broadcast Ended',
-    '接続エラー': 'Connection Error'
-  };
-  statusDiv.textContent = statusMap[text] || text;
+  statusDiv.textContent = text;
   statusDiv.className = className;
 }
 
-function updateViewerCount() {
-  viewerCount.textContent = `Viewers: ${peerConnections.size}`;
+function addChatMessage(sender, message) {
+  const msgDiv = document.createElement('div');
+  msgDiv.className = 'chat-message';
+  msgDiv.innerHTML = `
+    <div class="chat-sender">${sender}</div>
+    <div class="chat-text">${message}</div>
+  `;
+  chatMessages.appendChild(msgDiv);
+  chatMessages.scrollTop = chatMessages.scrollHeight;
+}
+
+function showReaction(text) {
+  const reaction = document.createElement('div');
+  reaction.className = 'floating-reaction';
+  reaction.textContent = text;
+  reaction.style.left = Math.random() * 70 + 15 + '%';
+  reaction.style.top = '70%';
+  reactionOverlay.appendChild(reaction);
+  
+  setTimeout(() => reaction.remove(), 3000);
+}
+
+function updateViewerList(viewers) {
+  viewerCount.textContent = viewers.length;
+  viewerList.innerHTML = '';
+  
+  if (viewers.length === 0) {
+    const emptyDiv = document.createElement('div');
+    emptyDiv.style.cssText = 'color: #8a7d6a; font-size: 0.8em; padding: 10px; text-align: center;';
+    emptyDiv.textContent = '// NO ACTIVE CONNECTIONS';
+    viewerList.appendChild(emptyDiv);
+    return;
+  }
+  
+  viewers.forEach(viewer => {
+    const div = document.createElement('div');
+    div.className = 'viewer-item';
+    div.textContent = viewer.name;
+    viewerList.appendChild(div);
+  });
 }
 
 function connectWebSocket() {
   if (ws && ws.readyState === WebSocket.OPEN) return;
   
-  updateStatus('接続中...', 'status-connected');
-  log('🔄 WebSocket接続を試行中...');
+  updateStatus('CONNECTING TO SERVER...', 'status-connected');
   ws = new WebSocket(WS_URL);
   
   ws.onopen = () => {
-    log('✅ WebSocket接続成功');
-    updateStatus('接続済み (配信待機中)', 'status-connected');
-    
-    // 配信者として登録
+    updateStatus('STANDBY MODE', 'status-connected');
     ws.send(JSON.stringify({ broadcaster: true }));
-    
-    if (reconnectInterval) {
-      clearInterval(reconnectInterval);
-      reconnectInterval = null;
-    }
   };
   
   ws.onmessage = async (e) => {
     try {
       const msg = JSON.parse(e.data);
       
-      // 新しい視聴者が接続した
       if (msg.type === 'newViewer') {
-        log(`👤 新しい視聴者: ${msg.viewerId}`);
         if (localStream) {
           await createPeerConnection(msg.viewerId);
-        } else {
-          log('⚠️ ローカルストリームがまだありません。配信開始後に再試行してください。');
         }
       }
-      
-      // 視聴者からのAnswer
       else if (msg.type === 'answer') {
-        log(`📥 視聴者 ${msg.viewerId} からAnswerを受信`);
         const pc = peerConnections.get(msg.viewerId);
         if (pc) {
           await pc.setRemoteDescription(new RTCSessionDescription(msg.answer));
-          log(`✅ 視聴者 ${msg.viewerId} とのネゴシエーション完了`);
         }
       }
-      
-      // 視聴者からのICE候補
       else if (msg.type === 'candidate') {
         const pc = peerConnections.get(msg.viewerId);
         if (pc && msg.candidate) {
-          log(`🧊 視聴者 ${msg.viewerId} からICE候補を受信`);
           await pc.addIceCandidate(new RTCIceCandidate(msg.candidate));
         }
       }
-      
-      // 視聴者が切断
       else if (msg.type === 'viewerDisconnected') {
-        log(`👋 視聴者 ${msg.viewerId} が切断`);
         const pc = peerConnections.get(msg.viewerId);
         if (pc) {
           pc.close();
           peerConnections.delete(msg.viewerId);
-          updateViewerCount();
         }
       }
-      
-      // 登録完了時に既存の視聴者リストを取得
-      else if (msg.type === 'registered' && msg.role === 'broadcaster') {
-        log('✅ 配信者として登録完了');
-        // 既存の視聴者がいるか確認
-        if (msg.existingViewers && msg.existingViewers.length > 0) {
-          log(`📋 既存の視聴者を検出: ${msg.existingViewers.length}人`);
-          // 配信開始後に既存視聴者に接続する
-          window.existingViewers = msg.existingViewers;
-        }
+      else if (msg.type === 'chat') {
+        addChatMessage(msg.senderName, msg.message);
+      }
+      else if (msg.type === 'reaction') {
+        showReaction(msg.emoji);
+      }
+      else if (msg.type === 'viewerList') {
+        updateViewerList(msg.viewers);
+      }
+      else if (msg.type === 'chatHistory') {
+        msg.messages.forEach(m => addChatMessage(m.senderName, m.message));
       }
       
     } catch (err) {
-      log('❌ メッセージ処理エラー: ' + err.message);
+      console.error('Message error:', err);
     }
-  };
-  
-  ws.onerror = (err) => {
-    log('❌ WebSocketエラー');
-    updateStatus('接続エラー', 'status-error');
   };
   
   ws.onclose = () => {
-    log('🔌 WebSocket切断');
-    updateStatus('切断されました', 'status-disconnected');
-    
-    if (!reconnectInterval) {
-      reconnectInterval = setInterval(() => {
-        log('🔄 自動再接続を試行...');
-        connectWebSocket();
-      }, 3000);
-    }
+    updateStatus('CONNECTION LOST', 'status-disconnected');
+    setTimeout(connectWebSocket, 3000);
   };
 }
 
 async function createPeerConnection(viewerId) {
   try {
-    log(`🔗 視聴者 ${viewerId} 用のPeerConnection作成`);
-    
     const pc = new RTCPeerConnection({ 
       iceServers: ICE_SERVERS,
-      iceCandidatePoolSize: 10,
-      bundlePolicy: 'max-bundle',
-      rtcpMuxPolicy: 'require'
+      iceCandidatePoolSize: 10
     });
     
-    // トラック追加
     localStream.getTracks().forEach(track => {
       pc.addTrack(track, localStream);
-      log(`➕ 視聴者 ${viewerId} にトラック追加: ${track.kind}`);
     });
     
-    // ICE候補の処理
     pc.onicecandidate = (e) => {
       if (e.candidate && ws && ws.readyState === WebSocket.OPEN) {
-        log(`🧊 視聴者 ${viewerId} 用のICE候補送信`);
         ws.send(JSON.stringify({ 
           candidate: e.candidate,
           targetViewerId: viewerId
@@ -451,45 +963,36 @@ async function createPeerConnection(viewerId) {
     };
     
     pc.oniceconnectionstatechange = () => {
-      log(`🔄 視聴者 ${viewerId} のICE状態: ${pc.iceConnectionState}`);
       if (pc.iceConnectionState === 'connected') {
-        updateStatus('🔴 配信中', 'status-streaming');
+        updateStatus('[ BROADCASTING ]', 'status-streaming');
+        startStatsMonitoring(pc);
       } else if (pc.iceConnectionState === 'failed') {
-        log(`❌ 視聴者 ${viewerId} との接続失敗`);
         pc.close();
         peerConnections.delete(viewerId);
-        updateViewerCount();
       }
     };
     
-    // Offer作成
     const offer = await pc.createOffer();
     await pc.setLocalDescription(offer);
-    log(`✅ 視聴者 ${viewerId} 用のOffer作成完了`);
     
-    // Offerを送信
     if (ws && ws.readyState === WebSocket.OPEN) {
       ws.send(JSON.stringify({ 
         offer,
         targetViewerId: viewerId
       }));
-      log(`📤 視聴者 ${viewerId} にOffer送信`);
     }
     
     peerConnections.set(viewerId, pc);
-    updateViewerCount();
     
   } catch (err) {
-    log(`❌ 視聴者 ${viewerId} の接続エラー: ${err.message}`);
+    console.error('PeerConnection error:', err);
   }
 }
 
 async function startBroadcast() {
   try {
-    log('🎬 配信開始処理を開始');
-    updateStatus('カメラ起動中...', 'status-connected');
+    updateStatus('INITIALIZING CAMERA...', 'status-connected');
     
-    // カメラ取得
     localStream = await navigator.mediaDevices.getUserMedia({
       video: {
         width: { ideal: 1280 },
@@ -499,60 +1002,184 @@ async function startBroadcast() {
       audio: false
     });
     
-    log('📹 カメラ取得成功');
     video.srcObject = localStream;
     
-    updateStatus('配信準備完了', 'status-streaming');
+    const videoTrack = localStream.getVideoTracks()[0];
+    const settings = videoTrack.getSettings();
+    document.getElementById('resolution').textContent = 
+      `${settings.width}x${settings.height}`;
+    document.getElementById('fps').textContent = `${settings.frameRate || 30} fps`;
+    
+    updateStatus('READY TO BROADCAST', 'status-streaming');
     startBtn.disabled = true;
     stopBtn.disabled = false;
+    recordBtn.disabled = false;
+    audioToggle.disabled = false;
     
-    // 既存の視聴者がいる場合（再接続時）
     if (window.existingViewers && window.existingViewers.length > 0) {
-      log(`🔄 既存の視聴者に再接続中: ${window.existingViewers.length}人`);
       for (const viewerId of window.existingViewers) {
         await createPeerConnection(viewerId);
-        // 少し間隔をあける
         await new Promise(resolve => setTimeout(resolve, 100));
       }
       window.existingViewers = null;
     }
     
   } catch (err) {
-    log('❌ 配信開始エラー: ' + err.message);
-    updateStatus('エラー: ' + err.message, 'status-error');
-    alert('カメラの起動に失敗しました。\n\nOBSの仮想カメラがONになっているか確認してください。');
+    console.error('Broadcast error:', err);
+    updateStatus('ERROR: CAMERA ACCESS DENIED', 'status-error');
+    alert('Failed to access camera. Please check if OBS Virtual Camera is enabled.');
   }
 }
 
 function stopBroadcast() {
-  log('🛑 配信停止');
-  
-  // 全PeerConnection終了
-  peerConnections.forEach((pc, viewerId) => {
-    pc.close();
-    log(`⏹️ 視聴者 ${viewerId} との接続を終了`);
-  });
+  peerConnections.forEach((pc) => pc.close());
   peerConnections.clear();
-  updateViewerCount();
   
-  // ストリーム停止
+  if (statsInterval) {
+    clearInterval(statsInterval);
+    statsInterval = null;
+  }
+  
   if (localStream) {
-    localStream.getTracks().forEach(track => {
-      track.stop();
-      log(`⏹️ トラック停止: ${track.kind}`);
-    });
+    localStream.getTracks().forEach(track => track.stop());
     localStream = null;
   }
   
+  if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+    mediaRecorder.stop();
+  }
+  
   video.srcObject = null;
-  updateStatus('配信停止', 'status-connected');
+  updateStatus('BROADCAST TERMINATED', 'status-connected');
+  
+  document.getElementById('bitrate').textContent = '0 kbps';
+  document.getElementById('fps').textContent = '0 fps';
+  document.getElementById('resolution').textContent = 'UNKNOWN';
+  document.getElementById('connection').textContent = 'DISCONNECTED';
   
   startBtn.disabled = false;
   stopBtn.disabled = true;
+  recordBtn.disabled = true;
+  audioToggle.disabled = true;
+}
+
+function startStatsMonitoring(pc) {
+  if (statsInterval) return;
+  
+  statsInterval = setInterval(async () => {
+    const stats = await pc.getStats();
+    stats.forEach(report => {
+      if (report.type === 'outbound-rtp' && report.mediaType === 'video') {
+        const bitrate = Math.round(report.bytesSent * 8 / 1000);
+        document.getElementById('bitrate').textContent = `${bitrate} kbps`;
+      }
+    });
+    
+    const state = pc.iceConnectionState;
+    const stateMap = {
+      'connected': 'OPTIMAL',
+      'checking': 'NEGOTIATING',
+      'disconnected': 'UNSTABLE',
+      'failed': 'FAILED'
+    };
+    document.getElementById('connection').textContent = stateMap[state] || state.toUpperCase();
+  }, 1000);
+}
+
+async function toggleAudio() {
+  if (!localStream) return;
+  
+  try {
+    if (hasAudio) {
+      const audioTrack = localStream.getAudioTracks()[0];
+      if (audioTrack) {
+        audioTrack.stop();
+        localStream.removeTrack(audioTrack);
+      }
+      audioToggle.textContent = '[ AUDIO: OFF ]';
+      hasAudio = false;
+    } else {
+      const audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const audioTrack = audioStream.getAudioTracks()[0];
+      localStream.addTrack(audioTrack);
+      
+      peerConnections.forEach(pc => {
+        pc.addTrack(audioTrack, localStream);
+      });
+      
+      audioToggle.textContent = '[ AUDIO: ON ]';
+      hasAudio = true;
+    }
+  } catch (err) {
+    console.error('Audio toggle error:', err);
+  }
+}
+
+function toggleRecording() {
+  if (!mediaRecorder || mediaRecorder.state === 'inactive') {
+    recordedChunks = [];
+    mediaRecorder = new MediaRecorder(localStream, {
+      mimeType: 'video/webm;codecs=vp9'
+    });
+    
+    mediaRecorder.ondataavailable = (e) => {
+      if (e.data.size > 0) {
+        recordedChunks.push(e.data);
+      }
+    };
+    
+    mediaRecorder.onstop = () => {
+      const blob = new Blob(recordedChunks, { type: 'video/webm' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `recording-${Date.now()}.webm`;
+      a.click();
+      URL.revokeObjectURL(url);
+      recordBtn.textContent = '[ RECORD ]';
+      recordBtn.classList.remove('recording');
+    };
+    
+    mediaRecorder.start();
+    recordBtn.textContent = '[ STOP REC ]';
+    recordBtn.classList.add('recording');
+  } else {
+    mediaRecorder.stop();
+  }
+}
+
+function sendChat() {
+  const message = chatInput.value.trim();
+  if (message && ws && ws.readyState === WebSocket.OPEN) {
+    ws.send(JSON.stringify({
+      type: 'chat',
+      message: message
+    }));
+    chatInput.value = '';
+  }
 }
 
 startBtn.onclick = startBroadcast;
 stopBtn.onclick = stopBroadcast;
+recordBtn.onclick = toggleRecording;
+audioToggle.onclick = toggleAudio;
+sendChatBtn.onclick = sendChat;
+
+chatInput.onkeypress = (e) => {
+  if (e.key === 'Enter') sendChat();
+};
+
+document.querySelectorAll('.reaction-btn').forEach(btn => {
+  btn.onclick = () => {
+    const text = btn.dataset.text;
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({
+        type: 'reaction',
+        emoji: text
+      }));
+    }
+  };
+});
 
 window.addEventListener('beforeunload', () => {
   stopBroadcast();
@@ -560,7 +1187,6 @@ window.addEventListener('beforeunload', () => {
 });
 
 connectWebSocket();
-log('🚀 配信者ページ読み込み完了');
 </script>
 </body>
 </html>
