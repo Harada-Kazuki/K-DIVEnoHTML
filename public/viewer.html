@@ -210,6 +210,16 @@
     background: rgba(10, 10, 10, 0.5);
   }
   
+  #disconnectBtn {
+    border-color: #ff6b6b;
+    color: #ff6b6b;
+  }
+  
+  #disconnectBtn:hover:not(:disabled) {
+    background: rgba(255, 107, 107, 0.1);
+    box-shadow: 0 0 20px rgba(255, 107, 107, 0.3);
+  }
+  
   .debug-info {
     margin-top: 40px;
     padding: 20px;
@@ -260,6 +270,7 @@
 
   <div class="controls">
     <button id="connectBtn">Connect & Watch</button>
+    <button id="disconnectBtn" disabled>Disconnect</button>
     <button id="fullscreenBtn">Fullscreen</button>
   </div>
 
@@ -293,12 +304,15 @@ let pc = null;
 let reconnectInterval = null;
 let myViewerId = null;
 let connectionTimeout = null;
-let isManualDisconnect = false;
+let isIntentionalDisconnect = false;
 let reconnectAttempts = 0;
 const MAX_RECONNECT_ATTEMPTS = 10;
+let isWatching = false;
+let broadcasterTemporarilyGone = false;
 
 const statusDiv = document.getElementById('status');
 const connectBtn = document.getElementById('connectBtn');
+const disconnectBtn = document.getElementById('disconnectBtn');
 const video = document.getElementById('remote');
 const debugLog = document.getElementById('debugLog');
 const fullscreenBtn = document.getElementById('fullscreenBtn');
@@ -318,12 +332,15 @@ function updateStatus(text, className) {
     'サーバーに接続中...': 'Connecting to Server...',
     '配信待機中...': 'Waiting for Broadcast...',
     '配信に接続中...': 'Connecting to Stream...',
+    '再接続中...': 'Reconnecting...',
+    '配信復旧待機中...': 'Waiting for Broadcaster...',
     '✅ 視聴中': '[ STREAMING ]',
     '配信が終了しました': 'Broadcast Ended',
     '接続が不安定です': 'Connection Unstable',
     '接続が切れました': 'Connection Lost',
     '切断されました': 'Disconnected',
-    '接続エラー': 'Connection Error'
+    '接続エラー': 'Connection Error',
+    '再接続失敗': 'Reconnection Failed'
   };
   statusDiv.textContent = statusMap[text] || text;
   statusDiv.className = className;
@@ -335,7 +352,6 @@ function connectWebSocket() {
   updateStatus('サーバーに接続中...', 'status-connecting');
   log('🔄 WebSocket接続を試行中...');
   
-  // タイムアウト設定
   if (connectionTimeout) clearTimeout(connectionTimeout);
   connectionTimeout = setTimeout(() => {
     log('⏱️ 接続タイムアウト（30秒）');
@@ -345,13 +361,16 @@ function connectWebSocket() {
       ws = null;
     }
     reconnectAttempts++;
-    if (reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
+    if (reconnectAttempts < MAX_RECONNECT_ATTEMPTS && isWatching && !isIntentionalDisconnect) {
       log(`🔄 再試行 (${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})`);
       setTimeout(connectWebSocket, 5000);
-    } else {
+    } else if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
       log('❌ 最大再試行回数に達しました');
+      updateStatus('再接続失敗', 'status-error');
       connectBtn.disabled = false;
+      disconnectBtn.disabled = true;
       reconnectAttempts = 0;
+      isWatching = false;
     }
   }, 30000);
   
@@ -359,7 +378,6 @@ function connectWebSocket() {
   
   ws.onopen = () => {
     log('✅ WebSocket接続成功');
-    updateStatus('配信待機中...', 'status-waiting');
     reconnectAttempts = 0;
     
     if (connectionTimeout) {
@@ -372,7 +390,13 @@ function connectWebSocket() {
       reconnectInterval = null;
     }
     
-    // 視聴者として登録
+    if (broadcasterTemporarilyGone) {
+      updateStatus('配信復旧待機中...', 'status-waiting');
+      log('⏳ 配信者の復帰を待機中...');
+    } else {
+      updateStatus('配信待機中...', 'status-waiting');
+    }
+    
     log('📤 視聴者として登録');
     ws.send(JSON.stringify({ 
       type: 'register',
@@ -385,31 +409,46 @@ function connectWebSocket() {
     try {
       const msg = JSON.parse(e.data);
       
-      // 登録完了
       if (msg.type === 'registered' && msg.role === 'viewer') {
         myViewerId = msg.viewerId;
         log(`✅ 視聴者IDを取得: ${myViewerId}`);
       }
       
-      // 配信終了
       else if (msg.type === 'broadcasterDisconnected') {
-        log('🛑 配信が終了しました');
-        updateStatus('配信が終了しました', 'status-error');
-        if (pc) {
-          pc.close();
-          pc = null;
+        if (msg.permanent) {
+          log('🛑 配信が完全に終了しました');
+          updateStatus('配信が終了しました', 'status-error');
+          if (pc) {
+            pc.close();
+            pc = null;
+          }
+          video.srcObject = null;
+          connectBtn.disabled = false;
+          disconnectBtn.disabled = true;
+          isWatching = false;
+          broadcasterTemporarilyGone = false;
+        } else {
+          log('⚠️ 配信者が一時的に切断 - 再接続を待機中...');
+          broadcasterTemporarilyGone = true;
+          updateStatus('配信復旧待機中...', 'status-waiting');
         }
-        video.srcObject = null;
-        connectBtn.disabled = false;
       }
       
-      // 配信者からのOffer
       else if (msg.type === 'offer') {
         log('📥 配信者からOfferを受信');
+        
+        if (broadcasterTemporarilyGone) {
+          log('✅ 配信者が復帰しました');
+          broadcasterTemporarilyGone = false;
+        }
+        
         updateStatus('配信に接続中...', 'status-connecting');
         
-        // PeerConnection作成
-        if (pc) pc.close();
+        if (pc) {
+          log('🧹 既存のPeerConnectionをクリーンアップ');
+          pc.close();
+        }
+        
         pc = new RTCPeerConnection({ 
           iceServers: ICE_SERVERS,
           iceCandidatePoolSize: 10,
@@ -418,7 +457,6 @@ function connectWebSocket() {
         });
         log('🔗 PeerConnection作成');
         
-        // リモートストリーム受信
         pc.ontrack = (e) => {
           log('📺 映像トラックを受信');
           log(`📺 トラック情報: kind=${e.track.kind}, enabled=${e.track.enabled}, readyState=${e.track.readyState}`);
@@ -431,7 +469,6 @@ function connectWebSocket() {
           updateStatus('✅ 視聴中', 'status-connected');
         };
         
-        // ICE候補の処理
         pc.onicecandidate = (e) => {
           if (e.candidate && ws && ws.readyState === WebSocket.OPEN) {
             log('🧊 ICE候補を配信者に送信');
@@ -456,7 +493,11 @@ function connectWebSocket() {
           } else if (state === 'failed') {
             log('❌ ICE接続失敗');
             updateStatus('接続が切れました', 'status-error');
-            video.srcObject = null;
+            
+            if (isWatching && !isIntentionalDisconnect) {
+              log('🔄 PeerConnection再構築を試行します');
+              video.srcObject = null;
+            }
           }
         };
         
@@ -464,7 +505,6 @@ function connectWebSocket() {
           log(`🔄 PeerConnection状態: ${pc.connectionState}`);
         };
         
-        // Offer設定とAnswer作成
         log('📝 RemoteDescriptionを設定');
         await pc.setRemoteDescription(new RTCSessionDescription(msg.offer));
         
@@ -473,7 +513,6 @@ function connectWebSocket() {
         await pc.setLocalDescription(answer);
         log('✅ LocalDescription設定完了');
         
-        // Answerを送信
         if (ws && ws.readyState === WebSocket.OPEN && myViewerId) {
           log('📤 Answerを配信者に送信');
           ws.send(JSON.stringify({ 
@@ -481,11 +520,8 @@ function connectWebSocket() {
             viewerId: myViewerId
           }));
         }
-        
-        connectBtn.disabled = true;
       }
       
-      // 配信者からのICE候補
       else if (msg.type === 'candidate' && pc) {
         log('🧊 配信者からICE候補を受信');
         await pc.addIceCandidate(new RTCIceCandidate(msg.candidate));
@@ -504,30 +540,96 @@ function connectWebSocket() {
   
   ws.onclose = () => {
     log('🔌 WebSocket切断');
-    updateStatus('切断されました', 'status-disconnected');
-    connectBtn.disabled = false;
     
-    if (!reconnectInterval) {
-      reconnectInterval = setInterval(() => {
-        log('🔄 自動再接続を試行...');
-        connectWebSocket();
-      }, 3000);
+    if (isIntentionalDisconnect) {
+      updateStatus('切断されました', 'status-disconnected');
+      log('✅ 視聴を正常に終了しました');
+      return;
+    }
+    
+    if (isWatching) {
+      updateStatus('再接続中...', 'status-connecting');
+      log('⚠️ 視聴中に切断されました - 自動再接続します');
+      
+      if (!reconnectInterval) {
+        reconnectInterval = setInterval(() => {
+          if (reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
+            reconnectAttempts++;
+            log(`🔄 自動再接続を試行... (${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})`);
+            connectWebSocket();
+          } else {
+            clearInterval(reconnectInterval);
+            reconnectInterval = null;
+            log('❌ 最大再接続回数に達しました');
+            updateStatus('再接続失敗', 'status-error');
+            connectBtn.disabled = false;
+            disconnectBtn.disabled = true;
+            isWatching = false;
+          }
+        }, 3000);
+      }
+    } else {
+      updateStatus('切断されました', 'status-disconnected');
+      connectBtn.disabled = false;
+      disconnectBtn.disabled = true;
     }
   };
 }
 
-connectBtn.onclick = () => {
-  isManualDisconnect = false;
+function startWatching() {
+  isIntentionalDisconnect = false;
+  isWatching = true;
   reconnectAttempts = 0;
+  broadcasterTemporarilyGone = false;
+  connectBtn.disabled = true;
+  disconnectBtn.disabled = false;
   connectWebSocket();
-};
+}
 
-// ページの可視性変更の監視（モバイル対応）
+function stopWatching() {
+  log('🛑 視聴終了');
+  isIntentionalDisconnect = true;
+  isWatching = false;
+  broadcasterTemporarilyGone = false;
+  
+  if (pc) {
+    pc.close();
+    pc = null;
+  }
+  
+  video.srcObject = null;
+  
+  if (ws) {
+    ws.close();
+    ws = null;
+  }
+  
+  if (reconnectInterval) {
+    clearInterval(reconnectInterval);
+    reconnectInterval = null;
+  }
+  
+  if (connectionTimeout) {
+    clearTimeout(connectionTimeout);
+    connectionTimeout = null;
+  }
+  
+  updateStatus('切断されました', 'status-disconnected');
+  connectBtn.disabled = false;
+  disconnectBtn.disabled = true;
+  
+  setTimeout(() => {
+    isIntentionalDisconnect = false;
+  }, 1000);
+}
+
+connectBtn.onclick = startWatching;
+disconnectBtn.onclick = stopWatching;
+
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'visible') {
     log('📱 ページが前面に復帰');
-    // WebSocketが切れていたら再接続
-    if (ws && ws.readyState !== WebSocket.OPEN && !isManualDisconnect) {
+    if (ws && ws.readyState !== WebSocket.OPEN && isWatching && !isIntentionalDisconnect) {
       log('🔄 バックグラウンド復帰後の再接続');
       connectWebSocket();
     }
@@ -536,10 +638,9 @@ document.addEventListener('visibilitychange', () => {
   }
 });
 
-// オンライン/オフライン検知
 window.addEventListener('online', () => {
   log('🌐 ネットワーク接続が復帰');
-  if (!isManualDisconnect) {
+  if (isWatching && !isIntentionalDisconnect) {
     connectWebSocket();
   }
 });
@@ -549,10 +650,8 @@ window.addEventListener('offline', () => {
   updateStatus('Network Offline', 'status-error');
 });
 
-// フルスクリーン機能
 fullscreenBtn.onclick = () => {
   if (!document.fullscreenElement && !document.webkitFullscreenElement && !document.mozFullScreenElement) {
-    // フルスクリーンに入る
     if (video.requestFullscreen) {
       video.requestFullscreen();
     } else if (video.webkitRequestFullscreen) {
@@ -564,7 +663,6 @@ fullscreenBtn.onclick = () => {
     }
     log('🖥️ フルスクリーンモードに入りました');
   } else {
-    // フルスクリーンを抜ける
     if (document.exitFullscreen) {
       document.exitFullscreen();
     } else if (document.webkitExitFullscreen) {
@@ -578,7 +676,6 @@ fullscreenBtn.onclick = () => {
   }
 };
 
-// フルスクリーン状態の変更を監視
 document.addEventListener('fullscreenchange', updateFullscreenButton);
 document.addEventListener('webkitfullscreenchange', updateFullscreenButton);
 document.addEventListener('mozfullscreenchange', updateFullscreenButton);
@@ -593,12 +690,8 @@ function updateFullscreenButton() {
 }
 
 window.addEventListener('beforeunload', () => {
-  isManualDisconnect = true;
-  if (pc) {
-    pc.close();
-    pc = null;
-  }
-  if (ws) ws.close();
+  isIntentionalDisconnect = true;
+  stopWatching();
 });
 
 log('🚀 視聴者ページ読み込み完了');
