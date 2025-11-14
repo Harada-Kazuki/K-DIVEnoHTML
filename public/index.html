@@ -88,6 +88,12 @@
     color: #5ac8fa;
     box-shadow: 0 0 20px rgba(90, 200, 250, 0.3);
   }
+  .status-connecting { 
+    border-color: #ff9f43;
+    color: #ff9f43;
+    box-shadow: 0 0 20px rgba(255, 159, 67, 0.3);
+    animation: pulse 1.5s infinite;
+  }
   .status-streaming { 
     border-color: #d4c5aa;
     color: #d4c5aa;
@@ -283,10 +289,11 @@ const ICE_SERVERS = [
 let ws = null;
 let localStream = null;
 let reconnectInterval = null;
-const peerConnections = new Map(); // viewerId -> RTCPeerConnection
-let isStreaming = false; // 配信中かどうか
+const peerConnections = new Map();
+let isStreaming = false;
 let reconnectAttempts = 0;
 const MAX_RECONNECT_ATTEMPTS = 10;
+let isIntentionalDisconnect = false;
 
 const statusDiv = document.getElementById('status');
 const startBtn = document.getElementById('startBtn');
@@ -311,10 +318,13 @@ function updateStatus(text, className) {
     '接続済み (配信待機中)': 'Standby Mode',
     'カメラ起動中...': 'Camera Initializing...',
     '配信準備完了': 'Ready to Broadcast',
+    '配信復旧中...': 'Restoring Broadcast...',
+    '再接続中...': 'Reconnecting...',
     '🔴 配信中': '[ LIVE ]',
     '切断されました': 'Connection Lost',
     '配信停止': 'Broadcast Ended',
-    '接続エラー': 'Connection Error'
+    '接続エラー': 'Connection Error',
+    '再接続失敗': 'Reconnection Failed'
   };
   statusDiv.textContent = statusMap[text] || text;
   statusDiv.className = className;
@@ -327,20 +337,26 @@ function updateViewerCount() {
 function connectWebSocket() {
   if (ws && ws.readyState === WebSocket.OPEN) return;
   
-  updateStatus('接続中...', 'status-connected');
+  updateStatus('接続中...', 'status-connecting');
   log('🔄 WebSocket接続を試行中...');
   ws = new WebSocket(WS_URL);
   
   ws.onopen = () => {
     log('✅ WebSocket接続成功');
-    updateStatus('接続済み (配信待機中)', 'status-connected');
-    
-    // 配信者として登録
-    ws.send(JSON.stringify({ broadcaster: true }));
+    reconnectAttempts = 0;
     
     if (reconnectInterval) {
       clearInterval(reconnectInterval);
       reconnectInterval = null;
+    }
+    
+    ws.send(JSON.stringify({ broadcaster: true }));
+    
+    if (localStream) {
+      log('🔄 配信中の再接続 - 既存視聴者との接続を復旧します');
+      updateStatus('配信復旧中...', 'status-streaming');
+    } else {
+      updateStatus('接続済み (配信待機中)', 'status-connected');
     }
   };
   
@@ -348,7 +364,6 @@ function connectWebSocket() {
     try {
       const msg = JSON.parse(e.data);
       
-      // 新しい視聴者が接続した
       if (msg.type === 'newViewer') {
         log(`👤 新しい視聴者: ${msg.viewerId}`);
         if (localStream) {
@@ -358,7 +373,6 @@ function connectWebSocket() {
         }
       }
       
-      // 視聴者からのAnswer
       else if (msg.type === 'answer') {
         log(`📥 視聴者 ${msg.viewerId} からAnswerを受信`);
         const pc = peerConnections.get(msg.viewerId);
@@ -368,7 +382,6 @@ function connectWebSocket() {
         }
       }
       
-      // 視聴者からのICE候補
       else if (msg.type === 'candidate') {
         const pc = peerConnections.get(msg.viewerId);
         if (pc && msg.candidate) {
@@ -377,7 +390,6 @@ function connectWebSocket() {
         }
       }
       
-      // 視聴者が切断
       else if (msg.type === 'viewerDisconnected') {
         log(`👋 視聴者 ${msg.viewerId} が切断`);
         const pc = peerConnections.get(msg.viewerId);
@@ -388,14 +400,33 @@ function connectWebSocket() {
         }
       }
       
-      // 登録完了時に既存の視聴者リストを取得
       else if (msg.type === 'registered' && msg.role === 'broadcaster') {
         log('✅ 配信者として登録完了');
-        // 既存の視聴者がいるか確認
+        
         if (msg.existingViewers && msg.existingViewers.length > 0) {
           log(`📋 既存の視聴者を検出: ${msg.existingViewers.length}人`);
-          // 配信開始後に既存視聴者に接続する
-          window.existingViewers = msg.existingViewers;
+          
+          if (localStream) {
+            log('🔄 配信中の再接続 - 視聴者との接続を再構築します');
+            
+            peerConnections.forEach((pc, viewerId) => {
+              if (pc.connectionState !== 'connected') {
+                pc.close();
+                peerConnections.delete(viewerId);
+                log(`🧹 古い接続をクリーンアップ: ${viewerId}`);
+              }
+            });
+            
+            for (const viewerId of msg.existingViewers) {
+              setTimeout(async () => {
+                await createPeerConnection(viewerId);
+              }, 100);
+            }
+            
+            updateStatus('🔴 配信中', 'status-streaming');
+          } else {
+            window.existingViewers = msg.existingViewers;
+          }
         }
       }
       
@@ -411,13 +442,33 @@ function connectWebSocket() {
   
   ws.onclose = () => {
     log('🔌 WebSocket切断');
-    updateStatus('切断されました', 'status-disconnected');
     
-    if (!reconnectInterval) {
-      reconnectInterval = setInterval(() => {
-        log('🔄 自動再接続を試行...');
-        connectWebSocket();
-      }, 3000);
+    if (isIntentionalDisconnect) {
+      updateStatus('配信停止', 'status-disconnected');
+      log('✅ 配信を正常に停止しました');
+      return;
+    }
+    
+    if (localStream) {
+      updateStatus('再接続中...', 'status-connecting');
+      log('⚠️ 配信中に切断されました - 自動再接続します');
+      
+      if (!reconnectInterval) {
+        reconnectInterval = setInterval(() => {
+          if (reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
+            reconnectAttempts++;
+            log(`🔄 自動再接続を試行... (${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})`);
+            connectWebSocket();
+          } else {
+            clearInterval(reconnectInterval);
+            reconnectInterval = null;
+            log('❌ 最大再接続回数に達しました');
+            updateStatus('再接続失敗', 'status-error');
+          }
+        }, 3000);
+      }
+    } else {
+      updateStatus('切断されました', 'status-disconnected');
     }
   };
 }
@@ -433,13 +484,11 @@ async function createPeerConnection(viewerId) {
       rtcpMuxPolicy: 'require'
     });
     
-    // トラック追加
     localStream.getTracks().forEach(track => {
       pc.addTrack(track, localStream);
       log(`➕ 視聴者 ${viewerId} にトラック追加: ${track.kind}`);
     });
     
-    // ICE候補の処理
     pc.onicecandidate = (e) => {
       if (e.candidate && ws && ws.readyState === WebSocket.OPEN) {
         log(`🧊 視聴者 ${viewerId} 用のICE候補送信`);
@@ -462,12 +511,10 @@ async function createPeerConnection(viewerId) {
       }
     };
     
-    // Offer作成
     const offer = await pc.createOffer();
     await pc.setLocalDescription(offer);
     log(`✅ 視聴者 ${viewerId} 用のOffer作成完了`);
     
-    // Offerを送信
     if (ws && ws.readyState === WebSocket.OPEN) {
       ws.send(JSON.stringify({ 
         offer,
@@ -487,9 +534,8 @@ async function createPeerConnection(viewerId) {
 async function startBroadcast() {
   try {
     log('🎬 配信開始処理を開始');
-    updateStatus('カメラ起動中...', 'status-connected');
+    updateStatus('カメラ起動中...', 'status-connecting');
     
-    // カメラ取得
     localStream = await navigator.mediaDevices.getUserMedia({
       video: {
         width: { ideal: 1280 },
@@ -506,12 +552,10 @@ async function startBroadcast() {
     startBtn.disabled = true;
     stopBtn.disabled = false;
     
-    // 既存の視聴者がいる場合（再接続時）
     if (window.existingViewers && window.existingViewers.length > 0) {
       log(`🔄 既存の視聴者に再接続中: ${window.existingViewers.length}人`);
       for (const viewerId of window.existingViewers) {
         await createPeerConnection(viewerId);
-        // 少し間隔をあける
         await new Promise(resolve => setTimeout(resolve, 100));
       }
       window.existingViewers = null;
@@ -526,8 +570,8 @@ async function startBroadcast() {
 
 function stopBroadcast() {
   log('🛑 配信停止');
+  isIntentionalDisconnect = true;
   
-  // 全PeerConnection終了
   peerConnections.forEach((pc, viewerId) => {
     pc.close();
     log(`⏹️ 視聴者 ${viewerId} との接続を終了`);
@@ -535,7 +579,6 @@ function stopBroadcast() {
   peerConnections.clear();
   updateViewerCount();
   
-  // ストリーム停止
   if (localStream) {
     localStream.getTracks().forEach(track => {
       track.stop();
@@ -545,18 +588,32 @@ function stopBroadcast() {
   }
   
   video.srcObject = null;
-  updateStatus('配信停止', 'status-connected');
   
+  if (ws) {
+    ws.close();
+    ws = null;
+  }
+  
+  if (reconnectInterval) {
+    clearInterval(reconnectInterval);
+    reconnectInterval = null;
+  }
+  
+  updateStatus('配信停止', 'status-disconnected');
   startBtn.disabled = false;
   stopBtn.disabled = true;
+  
+  setTimeout(() => {
+    isIntentionalDisconnect = false;
+  }, 1000);
 }
 
 startBtn.onclick = startBroadcast;
 stopBtn.onclick = stopBroadcast;
 
 window.addEventListener('beforeunload', () => {
+  isIntentionalDisconnect = true;
   stopBroadcast();
-  if (ws) ws.close();
 });
 
 connectWebSocket();
