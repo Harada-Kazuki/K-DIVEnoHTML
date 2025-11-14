@@ -1,4 +1,4 @@
-// server.js（修正版 - 視聴者ごとにOffer/Answer管理）
+// server.js（拡張版 - チャット、リアクション、視聴者リスト対応）
 import express from "express";
 import { WebSocketServer } from "ws";
 import http from "http";
@@ -20,8 +20,10 @@ app.get("/", (req, res) => {
 
 // 配信状態の管理
 let broadcaster = null;
-const viewers = new Map(); // viewerId -> { ws, id, connectedAt }
-let broadcasterDisconnectTimer = null; // 配信者の完全切断判定用
+const viewers = new Map(); // viewerId -> { ws, id, name, connectedAt }
+let broadcasterDisconnectTimer = null;
+let chatHistory = []; // チャット履歴（最大100件）
+const MAX_CHAT_HISTORY = 100;
 
 // 定期的なクリーンアップ
 setInterval(() => {
@@ -29,9 +31,40 @@ setInterval(() => {
     if (viewerInfo.ws.readyState !== 1) {
       viewers.delete(id);
       console.log(`🧹 Cleaned up viewer ${id}`);
+      broadcastViewerList();
     }
   });
 }, 30000);
+
+// 全員にメッセージをブロードキャスト
+function broadcastToAll(message) {
+  const msgStr = JSON.stringify(message);
+  
+  if (broadcaster && broadcaster.readyState === 1) {
+    broadcaster.send(msgStr);
+  }
+  
+  viewers.forEach((viewer) => {
+    if (viewer.ws.readyState === 1) {
+      viewer.ws.send(msgStr);
+    }
+  });
+}
+
+// 視聴者リストをブロードキャスト
+function broadcastViewerList() {
+  const viewerList = Array.from(viewers.values()).map(v => ({
+    id: v.id,
+    name: v.name,
+    connectedAt: v.connectedAt
+  }));
+  
+  broadcastToAll({
+    type: 'viewerList',
+    viewers: viewerList,
+    count: viewers.size
+  });
+}
 
 wss.on("connection", (ws) => {
   console.log("🔌 New WebSocket connection");
@@ -55,7 +88,6 @@ wss.on("connection", (ws) => {
         broadcaster = ws;
         isBroadcaster = true;
         
-        // 再接続の場合、タイマーをクリア
         if (broadcasterDisconnectTimer) {
           clearTimeout(broadcasterDisconnectTimer);
           broadcasterDisconnectTimer = null;
@@ -64,7 +96,6 @@ wss.on("connection", (ws) => {
         
         console.log("📡 Broadcaster registered");
         
-        // 既存の視聴者リストを送信
         const existingViewerIds = Array.from(viewers.keys());
         ws.send(JSON.stringify({ 
           type: 'registered',
@@ -72,59 +103,103 @@ wss.on("connection", (ws) => {
           existingViewers: existingViewerIds
         }));
         
-        if (existingViewerIds.length > 0) {
-          console.log(`📋 Existing viewers sent to broadcaster: ${existingViewerIds.length}`);
-        }
+        // チャット履歴を送信
+        ws.send(JSON.stringify({
+          type: 'chatHistory',
+          messages: chatHistory
+        }));
+        
+        broadcastViewerList();
         return;
       }
 
       // 👀 視聴者として登録
       if (data.viewer || (data.type === 'register' && data.role === 'viewer')) {
         const existingViewer = data.viewerId && viewers.has(data.viewerId);
+        const viewerName = data.name || `Viewer${Math.floor(Math.random() * 1000)}`;
         
         if (existingViewer) {
-          // 既存の視聴者が再接続
           viewerId = data.viewerId;
           const viewerInfo = viewers.get(viewerId);
-          viewerInfo.ws = ws; // WebSocketを更新
-          console.log(`🔄 Viewer ${viewerId} reconnected (total: ${viewers.size})`);
+          viewerInfo.ws = ws;
+          viewerInfo.name = viewerName;
+          console.log(`🔄 Viewer ${viewerId} (${viewerName}) reconnected`);
         } else {
-          // 新規視聴者
           viewerId = randomUUID();
           viewers.set(viewerId, {
             ws,
             id: viewerId,
+            name: viewerName,
             connectedAt: Date.now()
           });
-          console.log(`👤 Viewer ${viewerId} registered (total: ${viewers.size})`);
+          console.log(`👤 Viewer ${viewerId} (${viewerName}) registered (total: ${viewers.size})`);
         }
         
-        // 視聴者にIDを送信
         ws.send(JSON.stringify({ 
           type: 'registered',
           role: 'viewer',
-          viewerId
+          viewerId,
+          name: viewerName
         }));
         
-        // 配信者に新しい視聴者を通知（新規の場合のみ）
-        if (!existingViewer && broadcaster && broadcaster.readyState === 1) {
+        // チャット履歴を送信
+        ws.send(JSON.stringify({
+          type: 'chatHistory',
+          messages: chatHistory
+        }));
+        
+        if (broadcaster && broadcaster.readyState === 1) {
           broadcaster.send(JSON.stringify({
             type: 'newViewer',
             viewerId
           }));
-          console.log(`📤 Notified broadcaster about viewer ${viewerId}`);
-        } else if (existingViewer && broadcaster && broadcaster.readyState === 1) {
-          // 再接続の場合も通知（配信者側で再度Offerを送る）
-          broadcaster.send(JSON.stringify({
-            type: 'newViewer',
-            viewerId
-          }));
-          console.log(`📤 Notified broadcaster about reconnected viewer ${viewerId}`);
         }
+        
+        broadcastViewerList();
         return;
       }
 
-      // 🎥 配信者からのOffer（視聴者IDを含む）
+      // 💬 チャットメッセージ
+      if (data.type === 'chat') {
+        const chatMessage = {
+          type: 'chat',
+          senderId: isBroadcaster ? 'broadcaster' : viewerId,
+          senderName: isBroadcaster ? '📡 Broadcaster' : (viewers.get(viewerId)?.name || 'Unknown'),
+          message: data.message,
+          timestamp: Date.now()
+        };
+        
+        console.log(`💬 Chat from ${chatMessage.senderName}: ${data.message}`);
+        
+        // チャット履歴に追加
+        chatHistory.push(chatMessage);
+        if (chatHistory.length > MAX_CHAT_HISTORY) {
+          chatHistory.shift();
+        }
+        
+        // 全員にブロードキャスト
+        broadcastToAll(chatMessage);
+        return;
+      }
+
+      // 😊 リアクション
+      if (data.type === 'reaction') {
+        const reactionMessage = {
+          type: 'reaction',
+          senderId: isBroadcaster ? 'broadcaster' : viewerId,
+          senderName: isBroadcaster ? '📡 Broadcaster' : (viewers.get(viewerId)?.name || 'Unknown'),
+          emoji: data.emoji,
+          timestamp: Date.now()
+        };
+        
+        console.log(`😊 Reaction from ${reactionMessage.senderName}: ${data.emoji}`);
+        
+        // 全員にブロードキャスト
+        broadcastToAll(reactionMessage);
+        return;
+      }
+
+      // 🎥 配信者からのOffer
       if (data.offer && data.targetViewerId) {
         const viewer = viewers.get(data.targetViewerId);
         if (viewer && viewer.ws.readyState === 1) {
@@ -133,8 +208,6 @@ wss.on("connection", (ws) => {
             type: 'offer',
             offer: data.offer 
           }));
-        } else {
-          console.log(`❌ Viewer ${data.targetViewerId} not found or disconnected`);
         }
         return;
       }
@@ -188,14 +261,12 @@ wss.on("connection", (ws) => {
       console.log("🛑 Broadcaster disconnected");
       broadcaster = null;
       
-      // 10秒待って再接続がなければ完全終了と判断
       if (broadcasterDisconnectTimer) {
         clearTimeout(broadcasterDisconnectTimer);
       }
       
       broadcasterDisconnectTimer = setTimeout(() => {
         console.log("⏰ Broadcaster timeout - treating as permanent disconnect");
-        // 全視聴者に完全終了を通知
         viewers.forEach((viewer) => {
           if (viewer.ws.readyState === 1) {
             viewer.ws.send(JSON.stringify({ 
@@ -205,10 +276,10 @@ wss.on("connection", (ws) => {
           }
         });
         viewers.clear();
+        chatHistory = [];
         console.log("🧹 All viewers cleared due to permanent broadcaster disconnect");
-      }, 10000); // 10秒
+      }, 10000);
       
-      // 一時切断として全視聴者に通知
       viewers.forEach((viewer) => {
         if (viewer.ws.readyState === 1) {
           viewer.ws.send(JSON.stringify({ 
@@ -217,19 +288,20 @@ wss.on("connection", (ws) => {
           }));
         }
       });
-      console.log(`📌 Viewers kept for reconnection: ${viewers.size}`);
       
     } else if (viewerId) {
+      const viewerName = viewers.get(viewerId)?.name || 'Unknown';
       viewers.delete(viewerId);
-      console.log(`👋 Viewer ${viewerId} disconnected (remaining: ${viewers.size})`);
+      console.log(`👋 Viewer ${viewerId} (${viewerName}) disconnected (remaining: ${viewers.size})`);
       
-      // 配信者に通知
       if (broadcaster && broadcaster.readyState === 1) {
         broadcaster.send(JSON.stringify({
           type: 'viewerDisconnected',
           viewerId
         }));
       }
+      
+      broadcastViewerList();
     }
   });
 
